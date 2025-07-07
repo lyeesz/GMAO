@@ -1,0 +1,2445 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GMAO Web App - 3D Dark Theme</title>
+
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Chart.js for graphical KPIs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- FullCalendar.js for the planning -->
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+    <!-- FullCalendar RRule Plugin for recurring events -->
+    <script src='https://cdn.jsdelivr.net/npm/rrule@2.6.4/dist/es5/rrule.min.js'></script>
+    <script src='https://cdn.jsdelivr.net/npm/@fullcalendar/rrule@6.1.11/index.global.min.js'></script>
+
+
+    <!-- Toastify.js for notifications -->
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+
+    <!-- SheetJS (xlsx) for CSV/Excel management -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        /* Custom styles for the 3D dark theme */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a; /* bg-slate-900 */
+        }
+        
+        /* A subtle pattern for the background */
+        .bg-pattern {
+            background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,0.05) 1px, transparent 0);
+            background-size: 25px 25px;
+        }
+
+        /* The main container for the 3D cards */
+        .perspective-container {
+            perspective: 1000px;
+        }
+        
+        /* The card itself, which will have the 3D transform */
+        .card-3d {
+            transition: transform 0.1s ease-out, box-shadow 0.3s ease;
+            transform-style: preserve-3d;
+        }
+        
+        /* A pseudo-element for the card's background glow effect on hover */
+        .card-3d::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.08), transparent 70%);
+            border-radius: 0.75rem; /* 12px */
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            transform: translateZ(-20px); /* Push the glow back */
+        }
+        .card-3d:hover::before {
+            opacity: 1;
+        }
+
+        /* Form Input Styling */
+        .form-input {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            background-color: #1e293b; /* slate-800 */
+            border: 1px solid #334155; /* slate-700 */
+            color: #f1f5f9; /* slate-100 */
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .form-input:focus {
+            outline: none;
+            border-color: #4f46e5; /* indigo-600 */
+            box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.5);
+        }
+        
+        /* Button styles */
+        .btn {
+             font-weight: 600;
+             padding: 0.5rem 1rem;
+             border-radius: 0.5rem;
+             transition: background-color 0.3s;
+             display: inline-flex;
+             align-items: center;
+             justify-content: center;
+             color: white;
+        }
+        .btn-primary { background-color: #4f46e5; }
+        .btn-primary:hover { background-color: #4338ca; }
+        .btn-secondary { background-color: #475569; }
+        .btn-secondary:hover { background-color: #334155; }
+        .btn-success { background-color: #16a34a; }
+        .btn-success:hover { background-color: #15803d; }
+        .btn-danger { background-color: #dc2626; }
+        .btn-danger:hover { background-color: #b91c1c; }
+        .btn-warning { background-color: #f59e0b; color: #1e293b; }
+        .btn-warning:hover { background-color: #d97706; }
+
+
+        /* Custom styles for FullCalendar dark theme */
+        .fc {
+            color: white;
+        }
+        .fc .fc-button-primary {
+            background-color: #4f46e5; border-color: #4f46e5;
+        }
+        .fc .fc-button-primary:hover {
+            background-color: #4338ca; border-color: #4338ca;
+        }
+        .fc-daygrid-day.fc-day-today {
+            background-color: rgba(79, 70, 229, 0.2);
+        }
+        .fc .fc-daygrid-day-frame {
+             border-color: #334155; /* slate-700 */
+        }
+        .fc .fc-col-header-cell {
+            background-color: #1e293b; /* slate-800 */
+            border-color: #334155 !important;
+        }
+        .fc .fc-daygrid-day:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+        .fc-theme-standard .fc-scrollgrid {
+             border-color: #334155;
+        }
+        .fc-event {
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body class="text-slate-200 bg-pattern">
+
+    <!-- Main application container -->
+    <div id="app-container" class="w-full min-h-screen">
+        <!-- App content is injected here by JavaScript -->
+    </div>
+
+    <!-- Global Modals -->
+    <div id="delete-confirm-modal" class="fixed inset-0 bg-black bg-opacity-70 hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-sm border border-slate-700">
+            <h3 id="delete-modal-title" class="text-lg font-medium mb-2 text-white">Confirmer la suppression</h3>
+            <p id="delete-modal-text" class="text-sm text-slate-400 mb-4">Êtes-vous sûr de vouloir supprimer cet élément ? Cette action est irréversible.</p>
+            <div class="mt-4 flex justify-end space-x-2">
+                <button id="cancel-delete-btn" class="btn btn-secondary">Annuler</button>
+                <button id="confirm-delete-btn" class="btn btn-danger">Supprimer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for adding parts to OT -->
+    <div id="ot-parts-modal" class="fixed inset-0 bg-black bg-opacity-70 hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-lg border border-slate-700">
+            <h3 class="text-lg font-medium mb-4 text-white">Créer un Ordre de Travail (OT)</h3>
+            <form id="ot-parts-form">
+                <input type="hidden" id="ot-di-id">
+                <p class="text-slate-300 mb-4">Avez-vous besoin de pièces de rechange pour cette intervention ?</p>
+                <div class="flex items-center space-x-4 mt-2 mb-4">
+                    <label class="flex items-center"><input type="radio" name="ot-use-parts" value="no" class="bg-slate-900 border-slate-600 text-indigo-500 focus:ring-indigo-500" checked>&nbsp;<span class="text-slate-300">Non</span></label>
+                    <label class="flex items-center"><input type="radio" name="ot-use-parts" value="yes" class="bg-slate-900 border-slate-600 text-indigo-500 focus:ring-indigo-500">&nbsp;<span class="text-slate-300">Oui</span></label>
+                </div>
+                <div id="ot-parts-usage-container" class="hidden space-y-4 bg-slate-900/50 p-4 rounded-lg border border-slate-700">
+                     <div>
+                        <label for="ot-part-select" class="text-sm font-medium text-slate-300">Pièce utilisée</label>
+                        <select id="ot-part-select" class="form-input mt-1">
+                            <!-- Options will be populated by JS -->
+                        </select>
+                    </div>
+                    <div>
+                        <label for="ot-part-quantity" class="text-sm font-medium text-slate-300">Quantité</label>
+                        <input id="ot-part-quantity" type="number" min="1" placeholder="1" class="form-input mt-1">
+                    </div>
+                </div>
+                <div class="mt-6 flex justify-end space-x-2">
+                    <button type="button" id="cancel-ot-parts-btn" class="btn btn-secondary">Annuler</button>
+                    <button type="submit" class="btn btn-primary">Confirmer et Créer OT</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script type="module">
+        // Firebase modules
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, collection, addDoc, serverTimestamp, query, where, getDocs, onSnapshot, updateDoc, writeBatch, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- FIREBASE CONFIG ---
+        // IMPORTANT: Replace with your Firebase project credentials.
+        const firebaseConfig = {
+          apiKey: "AIzaSyDil6W3do4DWWL66CtnJFqVhGyN2XNIooA",
+          authDomain: "gmao-245ac.firebaseapp.com",
+          projectId: "gmao-245ac",
+          storageBucket: "gmao-245ac.firebasestorage.app",
+          messagingSenderId: "103682073367",
+          appId: "1:103682073367:web:3d7be867e6f35b7ebd4d52"
+        };
+        
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'gmao-app-default';
+        
+        let app, auth, db;
+        let currentUser = null;
+        let userRole = 'demandeur';
+        let userId = null;
+        
+        // Data caches
+        let allEquipments = []; 
+        let allParts = []; 
+        let allPreventiveTasks = [];
+        let allContracts = [];
+        
+        let notificationListenerUnsubscribe = null; // To prevent multiple listeners
+
+        // --- INITIALIZATION ---
+        function initApp() {
+            try {
+                if (firebaseConfig.apiKey === "VOTRE_API_KEY") {
+                    document.getElementById('app-container').innerHTML = `<div class="p-8 m-auto max-w-lg mt-20 text-center text-red-400 bg-red-900/50 rounded-lg border border-red-500">
+                        <h2 class="font-bold text-xl mb-2">Configuration Firebase manquante</h2>
+                        <p>Veuillez entrer vos informations Firebase dans le code pour que l'application puisse se connecter.</p>
+                        </div>`;
+                    return;
+                }
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+                setupAuthListener();
+                
+                // Setup global modal listeners once
+                const deleteModal = document.getElementById('delete-confirm-modal');
+                if (deleteModal) {
+                    document.getElementById('cancel-delete-btn').addEventListener('click', () => {
+                        deleteModal.classList.add('hidden');
+                    });
+                }
+
+            } catch (error) {
+                console.error("Erreur d'initialisation de Firebase:", error);
+                document.getElementById('app-container').innerHTML = `<div class="p-8 text-red-400">Erreur critique : Impossible de se connecter à Firebase.</div>`;
+            }
+        }
+        
+        // --- AUTHENTICATION ---
+        function setupAuthListener() {
+            onAuthStateChanged(auth, async (user) => {
+                if (user && !user.isAnonymous) {
+                    currentUser = user;
+                    userId = user.uid;
+                    await fetchUserRole(user.uid);
+                    setupNotificationListener(); // Setup notifications after role is known
+                    router(); 
+                } else {
+                    currentUser = null;
+                    userId = null;
+                    userRole = null;
+                    if(notificationListenerUnsubscribe) notificationListenerUnsubscribe(); // Clean up listener on logout
+                    renderLogin();
+                }
+            });
+        }
+        
+        async function fetchUserRole(uid) {
+            const userDocRef = doc(db, `artifacts/${appId}/users`, uid);
+            try {
+                const docSnap = await getDoc(userDocRef);
+                if (docSnap.exists()) {
+                    userRole = docSnap.data().role || 'demandeur';
+                } else {
+                    await setDoc(userDocRef, { 
+                        email: currentUser.email, 
+                        role: 'demandeur',
+                        createdAt: serverTimestamp()
+                    });
+                    userRole = 'demandeur';
+                }
+            } catch (error) {
+                console.error("Erreur lors de la récupération du rôle de l'utilisateur:", error);
+                userRole = 'demandeur';
+            }
+        }
+
+        // --- ROUTER ---
+        function router() {
+            const hash = window.location.hash || '#/dashboard';
+            if (!currentUser) {
+                renderLogin();
+                return;
+            }
+            
+            switch(hash) {
+                case '#/dashboard': renderDashboard(); break;
+                case '#/di/new': renderDIForm(); break;
+                case '#/di/list': renderDIList(); break;
+                case '#/planning': renderPlanning(); break;
+                case '#/preventive': renderPreventivePage(); break; 
+                case '#/users': renderUsersPage(); break;
+                case '#/equipments': renderEquipmentsPage(); break;
+                case '#/parts': renderPartsPage(); break;
+                case '#/contracts': renderContractsPage(); break; // New Route
+                default: renderDashboard();
+            }
+        }
+
+        // --- NOTIFICATIONS ---
+        function setupNotificationListener() {
+            if (notificationListenerUnsubscribe) {
+                notificationListenerUnsubscribe();
+            }
+
+            if (userRole !== 'admin' && userRole !== 'manager') {
+                if (document.getElementById('notification-area')) {
+                    document.getElementById('notification-area').innerHTML = '';
+                }
+                return;
+            }
+
+            const q = query(collection(db, `artifacts/${appId}/public/data/DI`), where("status", "==", "nouvelle"));
+            
+            notificationListenerUnsubscribe = onSnapshot(q, (snapshot) => {
+                const newDIs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                updateNotificationUI(newDIs);
+            }, (error) => {
+                console.error("Error fetching notifications: ", error);
+            });
+        }
+
+        function updateNotificationUI(notifications) {
+            const dot = document.getElementById('notification-dot');
+            const list = document.getElementById('notification-list');
+            const panel = document.getElementById('notification-panel');
+
+            if (!dot || !list || !panel) return;
+
+            list.innerHTML = ''; // Clear previous notifications
+
+            if (notifications.length > 0) {
+                // Only show the dot if the panel is not already open
+                if (panel.classList.contains('hidden')) {
+                    dot.classList.remove('hidden');
+                }
+                notifications.forEach(di => {
+                    const date = di.createdAt?.toDate().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }) || 'N/A';
+                    const item = document.createElement('a');
+                    item.href = '#/di/list';
+                    item.className = 'p-3 hover:bg-slate-700/50 border-b border-slate-700/50 last:border-b-0 block';
+                    item.innerHTML = `
+                        <p class="font-semibold text-white">Nouvelle DI: ${di.type}</p>
+                        <p class="text-sm text-slate-400 truncate">${di.description}</p>
+                        <p class="text-xs text-slate-500 mt-1">${date}</p>
+                    `;
+                    item.addEventListener('click', () => {
+                        panel.classList.add('hidden');
+                    });
+                    list.appendChild(item);
+                });
+            } else {
+                dot.classList.add('hidden');
+                list.innerHTML = '<p class="text-slate-400 text-center p-4">Aucune nouvelle notification.</p>';
+            }
+        }
+
+        // --- APP VIEWS ---
+        function renderLogin() {
+            document.getElementById('app-container').innerHTML = `
+                <div class="flex items-center justify-center min-h-screen bg-slate-900 bg-pattern">
+                    <div class="w-full max-w-md p-8 space-y-6 bg-slate-800/50 backdrop-blur-sm rounded-2xl shadow-2xl border border-slate-700">
+                        <h2 class="text-3xl font-bold text-center text-white">GMAO-IPM</h2>
+                        <form id="login-form" class="space-y-4">
+                            <h3 class="text-xl font-semibold text-slate-200">Connexion</h3>
+                            <div>
+                                <label for="login-email" class="text-sm font-medium text-slate-400">Email</label>
+                                <input id="login-email" type="email" required class="form-input mt-1">
+                            </div>
+                            <div>
+                                <label for="login-password" class="text-sm font-medium text-slate-400">Mot de passe</label>
+                                <input id="login-password" type="password" required class="form-input mt-1">
+                            </div>
+                            <button type="submit" class="w-full text-white bg-indigo-600 hover:bg-indigo-700 font-semibold py-2 px-4 rounded-lg transition-colors">Se connecter</button>
+                        </form>
+                        <div class="border-t border-slate-700 my-6"></div>
+                        <form id="register-form" class="space-y-4">
+                             <h3 class="text-xl font-semibold text-slate-200">Inscription</h3>
+                            <div>
+                                <label for="register-email" class="text-sm font-medium text-slate-400">Email</label>
+                                <input id="register-email" type="email" required class="form-input mt-1">
+                            </div>
+                            <div>
+                                <label for="register-password" class="text-sm font-medium text-slate-400">Mot de passe</label>
+                                <input id="register-password" type="password" required class="form-input mt-1">
+                            </div>
+                            <button type="submit" class="w-full text-white bg-slate-600 hover:bg-slate-700 font-semibold py-2 px-4 rounded-lg transition-colors">S'inscrire</button>
+                        </form>
+                    </div>
+                </div>`;
+
+            document.getElementById('login-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                try {
+                    await signInWithEmailAndPassword(auth, e.target['login-email'].value, e.target['login-password'].value);
+                    Toastify({ text: "Connexion réussie !", className: "info", style: { background: "linear-gradient(to right, #10b981, #6ee7b7)" }}).showToast();
+                } catch (error) {
+                    Toastify({ text: `Erreur: ${error.message}`, className: "error", style: { background: "linear-gradient(to right, #ef4444, #f87171)" } }).showToast();
+                }
+            });
+
+            document.getElementById('register-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                try {
+                    const userCredential = await createUserWithEmailAndPassword(auth, e.target['register-email'].value, e.target['register-password'].value);
+                    const userDocRef = doc(db, `artifacts/${appId}/users`, userCredential.user.uid);
+                    await setDoc(userDocRef, {
+                        email: userCredential.user.email,
+                        role: 'demandeur',
+                        createdAt: serverTimestamp()
+                    });
+                    Toastify({ text: "Inscription réussie ! Vous pouvez vous connecter.", className: "info", style: { background: "linear-gradient(to right, #10b981, #6ee7b7)" } }).showToast();
+                } catch (error) {
+                    Toastify({ text: `Erreur: ${error.message}`, className: "error", style: { background: "linear-gradient(to right, #ef4444, #f87171)" } }).showToast();
+                }
+            });
+        }
+
+        function renderSidebar() {
+            const hash = window.location.hash || '#/dashboard';
+            const linkClasses = "flex items-center space-x-3 px-4 py-2 rounded-lg hover:bg-slate-700 transition-colors duration-200";
+            const activeLinkClasses = "flex items-center space-x-3 px-4 py-2 rounded-lg bg-indigo-600 text-white font-semibold shadow-lg";
+
+            let navLinks = `
+                <a href="#/dashboard" class="${hash === '#/dashboard' ? activeLinkClasses : linkClasses}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" /></svg>
+                    <span>Dashboard</span>
+                </a>
+                <a href="#/di/new" class="${hash === '#/di/new' ? activeLinkClasses : linkClasses}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" /></svg>
+                    <span>Créer une DI</span>
+                </a>
+                <a href="#/di/list" class="${hash === '#/di/list' ? activeLinkClasses : linkClasses}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd" /></svg>
+                    <span>Suivi DI/OT</span>
+                </a>`;
+
+            if (userRole === 'manager' || userRole === 'admin' || userRole === 'technicien') {
+                navLinks += `<a href="#/planning" class="${hash === '#/planning' ? activeLinkClasses : linkClasses}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd" /></svg>
+                    <span>Planning</span></a>`;
+                navLinks += `<a href="#/preventive" class="${hash === '#/preventive' ? activeLinkClasses : linkClasses}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.414-1.414L11 10.586V6z" clip-rule="evenodd" /></svg>
+                    <span>Maintenance Préventive</span></a>`;
+                navLinks += `<a href="#/equipments" class="${hash === '#/equipments' ? activeLinkClasses : linkClasses}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" /><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3z" clip-rule="evenodd" /></svg>
+                    <span>Équipements</span></a>`;
+                navLinks += `<a href="#/parts" class="${hash === '#/parts' ? activeLinkClasses : linkClasses}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z" /></svg>
+                    <span>Pièces et Stocks</span></a>`;
+                navLinks += `<a href="#/contracts" class="${hash === '#/contracts' ? activeLinkClasses : linkClasses}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd" /></svg>
+                    <span>Contrats</span></a>`;
+            }
+            if (userRole === 'admin') {
+                navLinks += `<a href="#/users" class="${hash === '#/users' ? activeLinkClasses : linkClasses}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" /></svg>
+                    <span>Utilisateurs</span></a>`;
+            }
+
+            return `
+                <aside class="w-64 bg-slate-800/50 backdrop-blur-sm p-6 flex-col justify-between hidden md:flex">
+                    <div>
+                        <div class="flex items-center space-x-3 mb-10">
+                            <div class="p-2 bg-indigo-600 rounded-lg">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
+                            </div>
+                            <h1 class="text-xl font-bold">GMAO Pro</h1>
+                        </div>
+                        <nav class="flex flex-col space-y-2">${navLinks}</nav>
+                    </div>
+                    <div>
+                        <div class="text-xs text-slate-400 mb-2 truncate">${currentUser.email}</div>
+                        <button id="logout-btn" class="w-full text-white bg-slate-600 hover:bg-red-600 font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clip-rule="evenodd" /></svg>
+                            <span>Déconnexion</span>
+                        </button>
+                    </div>
+                </aside>`;
+        }
+        
+        function renderPage(title, content) {
+            const appContainer = document.getElementById('app-container');
+            const notificationArea = (userRole === 'admin' || userRole === 'manager') ? `
+                <div id="notification-area" class="relative">
+                    <button id="notification-btn" class="p-2 rounded-full hover:bg-slate-700 transition-colors duration-200 relative">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+                        <span id="notification-dot" class="absolute top-1 right-1 block h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-slate-900 hidden"></span>
+                    </button>
+                    <div id="notification-panel" class="absolute right-0 mt-2 w-80 bg-slate-800 border border-slate-700 rounded-lg shadow-xl hidden z-50">
+                        <div class="p-3 font-bold border-b border-slate-700 text-white">Notifications</div>
+                        <div id="notification-list" class="flex flex-col max-h-96 overflow-y-auto">
+                           <p class="text-slate-400 text-center p-4">Aucune nouvelle notification.</p>
+                        </div>
+                    </div>
+                </div>` : '';
+
+            appContainer.innerHTML = `
+                <div class="flex h-screen">
+                    ${renderSidebar()}
+                    <main class="flex-1 p-4 md:p-8 overflow-y-auto">
+                        <header class="flex justify-between items-center mb-8">
+                            <div>
+                                <h2 class="text-3xl font-bold text-white">${title}</h2>
+                                <p class="text-slate-400">GMAO-IPM / ${userRole}</p>
+                            </div>
+                            <div class="flex items-center space-x-4">
+                                ${notificationArea}
+                                <img src="https://placehold.co/40x40/7e22ce/ffffff?text=${currentUser.email.charAt(0).toUpperCase()}" alt="User" class="w-10 h-10 rounded-full border-2 border-indigo-500">
+                            </div>
+                        </header>
+                        ${content}
+                    </main>
+                </div>`;
+            
+            document.getElementById('logout-btn').addEventListener('click', async () => {
+                await signOut(auth);
+                window.location.hash = '';
+                window.location.reload();
+            });
+
+            const notificationBtn = document.getElementById('notification-btn');
+            if (notificationBtn) {
+                const notificationPanel = document.getElementById('notification-panel');
+                const notificationDot = document.getElementById('notification-dot');
+
+                notificationBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    notificationPanel.classList.toggle('hidden');
+                    if (!notificationPanel.classList.contains('hidden')) {
+                        notificationDot.classList.add('hidden');
+                    }
+                });
+
+                window.addEventListener('click', (e) => {
+                    if (notificationPanel && !notificationPanel.classList.contains('hidden')) {
+                        if (!notificationBtn.contains(e.target) && !notificationPanel.contains(e.target)) {
+                            notificationPanel.classList.add('hidden');
+                        }
+                    }
+                });
+            }
+            // After rendering the page, we need to re-attach the listener for notifications
+            setupNotificationListener();
+        }
+        
+        function renderDashboard() {
+            const content = `
+                <div id="charts-dashboard" class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-8"></div>
+                <div class="mt-10 bg-slate-800/70 backdrop-blur-sm rounded-xl border border-slate-700">
+                    <h3 class="text-xl font-bold p-6">Vos Demandes d'Intervention Récentes</h3>
+                    <div id="recent-di-list" class="space-y-2 p-6 pt-0">
+                        <p class="text-slate-400">Chargement des demandes...</p>
+                    </div>
+                </div>`;
+            renderPage('Tableau de Bord', content);
+            setupDashboardCharts();
+            loadRecentDIs();
+        }
+
+        async function setupDashboardCharts() {
+            const chartContainer = document.getElementById('charts-dashboard');
+            if(!chartContainer) return;
+
+            chartContainer.innerHTML = `
+                <div class="bg-slate-800/70 backdrop-blur-sm p-6 rounded-xl border border-slate-700 col-span-1 lg:col-span-2 xl:col-span-1"><canvas id="interventionTypeChart"></canvas></div>
+                <div class="bg-slate-800/70 backdrop-blur-sm p-6 rounded-xl border border-slate-700"><canvas id="interventionStatusChart"></canvas></div>
+                <div class="bg-slate-800/70 backdrop-blur-sm p-6 rounded-xl border border-slate-700"><canvas id="stockStatusChart"></canvas></div>
+                <div id="total-equipments-kpi-container" class="perspective-container"></div>
+            `;
+            
+            const diQuery = collection(db, `artifacts/${appId}/public/data/DI`);
+            const partsQuery = collection(db, `artifacts/${appId}/public/data/spareParts`);
+            const equipQuery = collection(db, `artifacts/${appId}/public/data/equipements`);
+
+            const [diSnapshot, partsSnapshot, equipSnapshot] = await Promise.all([
+                getDocs(diQuery), 
+                getDocs(partsQuery),
+                getDocs(equipQuery)
+            ]);
+            
+            const interventions = diSnapshot.docs.map(doc => doc.data());
+            const parts = partsSnapshot.docs.map(doc => doc.data());
+            const equipments = equipSnapshot.docs.map(doc => doc.data());
+            
+            // --- KPI Card: Total Equipment ---
+            const equipKpiContainer = document.getElementById('total-equipments-kpi-container');
+            if (equipKpiContainer) {
+                equipKpiContainer.innerHTML = `
+                    <div class="card-3d bg-slate-800/70 backdrop-blur-sm p-6 rounded-xl shadow-2xl border border-slate-700 hover:shadow-teal-500/50 h-full flex flex-col justify-between">
+                        <div>
+                            <div class="flex justify-between items-start">
+                                <div style="transform: translateZ(20px);">
+                                    <h3 class="text-slate-400 font-medium">Équipements</h3>
+                                    <p id="total-equipments-kpi" class="text-4xl font-bold text-white">${equipments.length}</p>
+                                </div>
+                                <div class="p-3 bg-teal-500 rounded-lg" style="transform: translateZ(30px);">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="space-y-2 mt-4" style="transform: translateZ(10px);">
+                           <select id="equip-filter-loc" class="form-input text-sm py-1"><option value="all">Toutes localisations</option></select>
+                           <select id="equip-filter-des" class="form-input text-sm py-1"><option value="all">Toutes désignations</option></select>
+                        </div>
+                    </div>
+                `;
+                
+                const locFilter = document.getElementById('equip-filter-loc');
+                const desFilter = document.getElementById('equip-filter-des');
+                const totalEquipmentsElement = document.getElementById('total-equipments-kpi');
+
+                const uniqueLocalisations = [...new Set(equipments.map(e => e.localisation?.trim()).filter(Boolean))];
+                const uniqueDesignations = [...new Set(equipments.map(e => e.designation?.trim()).filter(Boolean))];
+
+                uniqueLocalisations.forEach(loc => locFilter.innerHTML += `<option value="${loc}">${loc}</option>`);
+                uniqueDesignations.forEach(des => desFilter.innerHTML += `<option value="${des}">${des}</option>`);
+
+                const updateEquipmentsKpi = () => {
+                    const selectedLoc = locFilter.value;
+                    const selectedDes = desFilter.value;
+
+                    const filtered = equipments.filter(e => {
+                        const locMatch = selectedLoc === 'all' || e.localisation?.trim() === selectedLoc;
+                        const desMatch = selectedDes === 'all' || e.designation?.trim() === selectedDes;
+                        return locMatch && desMatch;
+                    });
+                    totalEquipmentsElement.textContent = filtered.length;
+                };
+
+                locFilter.addEventListener('change', updateEquipmentsKpi);
+                desFilter.addEventListener('change', updateEquipmentsKpi);
+            }
+
+            // --- Chart 1: Intervention Types ---
+            const typeCounts = interventions.reduce((acc, di) => {
+                acc[di.type] = (acc[di.type] || 0) + 1;
+                return acc;
+            }, {});
+
+            const typeCtx = document.getElementById('interventionTypeChart').getContext('2d');
+            new Chart(typeCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(typeCounts),
+                    datasets: [{
+                        label: 'Interventions par Type',
+                        data: Object.values(typeCounts),
+                        backgroundColor: ['#6366f1', '#38bdf8', '#fbbf24', '#4ade80', '#a78bfa', '#f87171'],
+                        borderColor: '#0f172a',
+                        borderWidth: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'top', labels: { color: '#cbd5e1' } },
+                        title: { display: true, text: 'Répartition des Interventions par Type', color: '#cbd5e1', font: { size: 16 } }
+                    }
+                }
+            });
+
+            // --- Chart 2: Intervention Status ---
+            const statusOrder = ['nouvelle', 'planifiée', 'en cours', 'clôturée'];
+            const statusCounts = interventions.reduce((acc, di) => {
+                acc[di.status] = (acc[di.status] || 0) + 1;
+                return acc;
+            }, {});
+
+            const statusCtx = document.getElementById('interventionStatusChart').getContext('2d');
+            new Chart(statusCtx, {
+                type: 'bar',
+                data: {
+                    labels: statusOrder,
+                    datasets: [{
+                        label: 'Nombre d\'Interventions',
+                        data: statusOrder.map(status => statusCounts[status] || 0),
+                        backgroundColor: ['#3b82f6', '#8b5cf6', '#f59e0b', '#22c55e'],
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { display: false },
+                        title: { display: true, text: 'Statut des Interventions', color: '#cbd5e1', font: { size: 16 } }
+                    },
+                    scales: {
+                        y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
+                        x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }
+                    }
+                }
+            });
+
+            // --- Chart 3: Stock Status ---
+            const stockStatus = { ok: 0, low: 0, critical: 0 };
+            parts.forEach(part => {
+                const stock = parseInt(part.stock, 10);
+                const stockMin = parseInt(part.stockMin, 10);
+                if (stock === 0) {
+                    stockStatus.critical++;
+                } else if (stock < stockMin) {
+                    stockStatus.low++;
+                } else {
+                    stockStatus.ok++;
+                }
+            });
+
+            const stockCtx = document.getElementById('stockStatusChart').getContext('2d');
+            new Chart(stockCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['OK', 'Faible', 'Critique'],
+                    datasets: [{
+                        label: 'État des Stocks',
+                        data: [stockStatus.ok, stockStatus.low, stockStatus.critical],
+                        backgroundColor: ['#22c55e', '#f59e0b', '#ef4444'],
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    plugins: {
+                        legend: { display: false },
+                        title: { display: true, text: 'État des Stocks de Pièces', color: '#cbd5e1', font: { size: 16 } }
+                    },
+                    scales: {
+                        y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
+                        x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }
+                    }
+                }
+            });
+            
+            setup3dCardEffect();
+        }
+
+        function renderDIForm() {
+            const content = `<div class="max-w-3xl mx-auto"><form id="di-form" class="bg-slate-800/70 border border-slate-700 p-8 space-y-6 rounded-xl">
+                <div>
+                    <label for="di-type" class="text-sm font-medium text-slate-300">Type de problème</label>
+                    <select id="di-type" required class="form-input mt-1">
+                        <option>Biomédical</option><option>Électrique</option><option>Plomberie</option><option>Bâtiment</option><option>Autre</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="di-location" class="text-sm font-medium text-slate-300">Lieu / Équipement</label>
+                    <input id="di-location" type="text" placeholder="Ex: Recherche, Virologie" required class="form-input mt-1">
+                </div>
+                <div>
+                    <label for="di-description" class="text-sm font-medium text-slate-300">Description du problème</label>
+                    <textarea id="di-description" rows="4" required class="form-input mt-1"></textarea>
+                </div>
+                <div class="flex justify-end"><button type="submit" class="btn btn-primary">Soumettre la Demande</button></div>
+            </form></div>`;
+            renderPage("Créer une Demande d'Intervention (DI)", content);
+            
+            document.getElementById('di-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const diData = {
+                    type: document.getElementById('di-type').value,
+                    location: document.getElementById('di-location').value,
+                    description: document.getElementById('di-description').value,
+                    demandeurId: userId,
+                    demandeurEmail: currentUser.email,
+                    createdAt: serverTimestamp(),
+                    status: 'nouvelle',
+                    isOT: false,
+                    usedParts: []
+                };
+                try {
+                    await addDoc(collection(db, `artifacts/${appId}/public/data/DI`), diData);
+                    Toastify({ text: "Demande créée avec succès !", style: { background: "linear-gradient(to right, #10b981, #6ee7b7)" } }).showToast();
+                    window.location.hash = '#/di/list';
+                } catch (error) {
+                    Toastify({ text: `Erreur: ${error.message}`, className: "error", style: { background: "linear-gradient(to right, #ef4444, #f87171)" } }).showToast();
+                }
+            });
+        }
+        
+        function renderDIList() {
+            const content = `<div class="bg-slate-800/70 border border-slate-700 rounded-xl p-6"><div id="di-list-container" class="space-y-4"></div></div>`;
+            renderPage("Suivi des Demandes d'Intervention et OT", content);
+            
+            const diCollectionRef = collection(db, `artifacts/${appId}/public/data/DI`);
+            const q = (userRole === 'admin' || userRole === 'manager' || userRole === 'technicien') 
+                ? query(diCollectionRef)
+                : query(diCollectionRef, where("demandeurId", "==", userId));
+            
+            onSnapshot(q, (querySnapshot) => {
+                const listContainer = document.getElementById('di-list-container');
+                if(!listContainer) return;
+                
+                if (querySnapshot.empty) {
+                    listContainer.innerHTML = '<p class="text-slate-400">Aucune demande d\'intervention pour le moment.</p>';
+                    return;
+                }
+                
+                listContainer.innerHTML = '';
+                querySnapshot.docs.sort((a,b) => b.data().createdAt - a.data().createdAt).forEach((doc) => {
+                    const di = doc.data();
+                    const diId = doc.id;
+                    const date = di.createdAt?.toDate().toLocaleDateString('fr-FR') || 'N/A';
+                    
+                    let statusColor = 'bg-blue-500/20 text-blue-300';
+                    if(di.isOT) statusColor = 'bg-purple-500/20 text-purple-300';
+                    if (di.status === 'en cours') statusColor = 'bg-yellow-500/20 text-yellow-300';
+                    if (di.status === 'clôturée') statusColor = 'bg-green-500/20 text-green-300';
+                    
+                    const adminDeleteButton = (userRole === 'admin') ? `<button data-di-id="${diId}" class="delete-di-btn text-white bg-red-800 hover:bg-red-900 font-semibold py-1 px-3 text-sm rounded-md transition-colors mt-2">Supprimer</button>` : '';
+
+                    // Display used parts if available
+                    let usedPartsHtml = '';
+                    if (di.usedParts && di.usedParts.length > 0) {
+                        const partsList = di.usedParts.map(p => `<li>${p.quantity} x ${p.partName}</li>`).join('');
+                        usedPartsHtml = `
+                            <div class="mt-3 pt-3 border-t border-slate-700/50">
+                                <p class="text-sm font-semibold text-slate-400">Pièces utilisées:</p>
+                                <ul class="list-disc list-inside text-sm text-slate-400 pl-2">
+                                    ${partsList}
+                                </ul>
+                            </div>
+                        `;
+                    }
+
+                    const card = document.createElement('div');
+                    card.className = 'bg-slate-900/50 p-4 rounded-lg border border-slate-700';
+                    card.innerHTML = `
+                        <div class="flex justify-between items-start flex-wrap gap-4">
+                            <div>
+                                <p class="font-bold text-lg text-white">${di.isOT ? 'OT' : 'DI'}: ${di.type} - ${di.location}</p>
+                                <p class="text-slate-300 mt-1">${di.description}</p>
+                                <p class="text-sm text-slate-500 mt-2">Demandé le: ${date} par ${di.demandeurEmail}</p>
+                            </div>
+                            <div class="flex flex-col items-end space-y-2 flex-shrink-0">
+                               <span class="text-sm font-semibold px-3 py-1 rounded-full ${statusColor}">${di.status}</span>
+                               ${(userRole === 'manager' || userRole === 'admin') && !di.isOT ? `<button data-di-id="${diId}" class="create-ot-btn text-white bg-green-600 hover:bg-green-700 font-semibold py-1 px-3 text-sm rounded-md transition-colors">Créer OT</button>` : ''}
+                               ${(userRole === 'manager' || userRole === 'admin' || userRole === 'technicien') && di.isOT && di.status !== 'clôturée' ? `<button data-di-id="${diId}" class="close-ot-btn text-white bg-red-600 hover:bg-red-700 font-semibold py-1 px-3 text-sm rounded-md transition-colors mt-2">Clôturer</button>` : ''}
+                               ${adminDeleteButton}
+                            </div>
+                        </div>
+                        ${usedPartsHtml}`;
+                    listContainer.appendChild(card);
+                });
+
+                document.querySelectorAll('.create-ot-btn').forEach(button => {
+                    button.addEventListener('click', (e) => openOtPartsModal(e.target.dataset.diId));
+                });
+                document.querySelectorAll('.close-ot-btn').forEach(button => {
+                    button.addEventListener('click', (e) => closeOT(e.target.dataset.diId));
+                });
+                document.querySelectorAll('.delete-di-btn').forEach(button => {
+                    button.addEventListener('click', (e) => {
+                        openDeleteDIModal(e.currentTarget.dataset.diId);
+                    });
+                });
+            }, (error) => {
+                 document.getElementById('di-list-container').innerHTML = '<p class="text-red-400">Impossible de charger les demandes.</p>';
+            });
+        }
+        
+        async function openOtPartsModal(diId) {
+            const modal = document.getElementById('ot-parts-modal');
+            modal.classList.remove('hidden');
+
+            document.getElementById('ot-di-id').value = diId;
+            const form = document.getElementById('ot-parts-form');
+            form.reset(); // Reset form state
+
+            // Fetch parts if not already in cache
+            if (allParts.length === 0) {
+                try {
+                    const partsCollectionRef = collection(db, `artifacts/${appId}/public/data/spareParts`);
+                    const snapshot = await getDocs(partsCollectionRef);
+                    allParts = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
+                } catch (error) {
+                    console.error("Failed to fetch spare parts:", error);
+                }
+            }
+
+            const partsSelect = document.getElementById('ot-part-select');
+            partsSelect.innerHTML = `<option value="">-- Choisir une pièce --</option>` + 
+                allParts.map(part => `<option value="${part.id}">${part.designation} (Stock: ${part.stock})</option>`).join('');
+
+            document.querySelectorAll('input[name="ot-use-parts"]').forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    const container = document.getElementById('ot-parts-usage-container');
+                    container.classList.toggle('hidden', e.target.value === 'no');
+                });
+            });
+            
+            document.getElementById('cancel-ot-parts-btn').addEventListener('click', () => modal.classList.add('hidden'));
+
+            form.onsubmit = async (e) => {
+                e.preventDefault();
+                const useParts = document.querySelector('input[name="ot-use-parts"]:checked').value === 'yes';
+                let usedPartsInfo = null;
+
+                if (useParts) {
+                    const partId = document.getElementById('ot-part-select').value;
+                    const quantity = parseInt(document.getElementById('ot-part-quantity').value, 10);
+                    
+                    if (!partId || !quantity || quantity <= 0) {
+                        Toastify({ text: "Veuillez sélectionner une pièce et une quantité valide.", className: "error", style: { background: "orange" } }).showToast();
+                        return;
+                    }
+                    const partToUpdate = allParts.find(p => p.id === partId);
+                    if (!partToUpdate || partToUpdate.stock < quantity) {
+                        Toastify({ text: `Stock insuffisant pour ${partToUpdate.designation}.`, className: "error", style: { background: "red" } }).showToast();
+                        return;
+                    }
+                    usedPartsInfo = {
+                        partId: partId,
+                        partName: partToUpdate.designation,
+                        quantity: quantity,
+                        newStock: partToUpdate.stock - quantity
+                    };
+                }
+                
+                await createOTFromDI(diId, usedPartsInfo);
+                modal.classList.add('hidden');
+            };
+        }
+
+        async function createOTFromDI(diId, usedPartsInfo) {
+            const diDocRef = doc(db, `artifacts/${appId}/public/data/DI`, diId);
+            
+            try {
+                const batch = writeBatch(db);
+
+                const updateData = { isOT: true, status: 'planifiée' };
+                if (usedPartsInfo) {
+                    updateData.usedParts = [{
+                        partId: usedPartsInfo.partId,
+                        partName: usedPartsInfo.partName,
+                        quantity: usedPartsInfo.quantity
+                    }];
+                    
+                    const partDocRef = doc(db, `artifacts/${appId}/public/data/spareParts`, usedPartsInfo.partId);
+                    batch.update(partDocRef, { stock: usedPartsInfo.newStock });
+                }
+
+                batch.update(diDocRef, updateData);
+                await batch.commit();
+
+                Toastify({ text: "OT créé avec succès !", style: { background: "linear-gradient(to right, #4f46e5, #6366f1)" } }).showToast();
+            } catch(e) {
+                Toastify({ text: `Erreur création OT: ${e.message}`, className: "error", style: { background: "linear-gradient(to right, #ef4444, #f87171)" } }).showToast();
+            }
+        }
+
+        async function closeOT(diId) {
+            const diDocRef = doc(db, `artifacts/${appId}/public/data/DI`, diId);
+             try {
+                await updateDoc(diDocRef, { status: 'clôturée' });
+                Toastify({ text: "Intervention clôturée avec succès !", style: { background: "linear-gradient(to right, #10b981, #6ee7b7)" } }).showToast();
+            } catch(e) {
+                Toastify({ text: `Erreur: ${e.message}`, className: "error", style: { background: "linear-gradient(to right, #ef4444, #f87171)" } }).showToast();
+            }
+        }
+
+        function openDeleteDIModal(diId) {
+            openDeleteModal(diId, 'di');
+        }
+
+        async function handleDeleteDI(diId) {
+            if (!diId) return;
+            const diDocRef = doc(db, `artifacts/${appId}/public/data/DI`, diId);
+            try {
+                await deleteDoc(diDocRef);
+                Toastify({ text: "Demande/OT supprimé(e).", style: { background: "linear-gradient(to right, #ef4444, #f87171)" } }).showToast();
+                document.getElementById('delete-confirm-modal').classList.add('hidden');
+            } catch (error) {
+                Toastify({ text: `Erreur: ${error.message}`, className: "error", style: { background: "red" } }).showToast();
+            }
+        }
+        
+        function renderPlanning() {
+            if (userRole !== 'manager' && userRole !== 'admin' && userRole !== 'technicien') {
+                renderPage('Accès non autorisé', '<p class="text-red-400">Vous n\'avez pas les droits pour accéder à cette page.</p>');
+                return;
+            }
+            const content = `
+                <div class="bg-slate-800/70 border border-slate-700 rounded-xl p-4"><div id='calendar'></div></div>
+                
+                <!-- Modal for ADDING event -->
+                <div id="event-modal" class="fixed inset-0 bg-black bg-opacity-70 overflow-y-auto h-full w-full hidden z-50 flex items-center justify-center">
+                  <div class="relative p-5 border w-full max-w-md shadow-lg rounded-xl bg-slate-800 border-slate-700">
+                    <div class="mt-3 text-center">
+                      <h3 class="text-lg leading-6 font-medium text-white">Ajouter un événement au planning</h3>
+                      <div class="mt-2 px-7 py-3">
+                        <form id="add-event-form" class="space-y-4">
+                          <input type="text" id="event-title" placeholder="Titre de l'événement" class="form-input" required>
+                          <input type="text" id="event-date-display" class="form-input" disabled>
+                          <input type="hidden" id="event-date">
+                          <button type="submit" class="text-white bg-indigo-600 hover:bg-indigo-700 font-semibold py-2 px-4 rounded-lg transition-colors w-full">Enregistrer</button>
+                        </form>
+                      </div>
+                      <div class="items-center px-4 py-3">
+                        <button id="close-modal-btn" class="text-white bg-slate-600 hover:bg-slate-700 font-semibold py-2 px-4 rounded-lg transition-colors w-full">Annuler</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Modal for EDITING event -->
+                <div id="edit-event-modal" class="fixed inset-0 bg-black bg-opacity-70 overflow-y-auto h-full w-full hidden z-50 flex items-center justify-center">
+                  <div class="relative p-5 border w-full max-w-md shadow-lg rounded-xl bg-slate-800 border-slate-700">
+                    <div class="mt-3">
+                      <h3 class="text-lg leading-6 font-medium text-white text-center">Modifier l'événement</h3>
+                      <div class="mt-4 px-7 py-3">
+                        <form id="edit-event-form" class="space-y-4">
+                          <input type="hidden" id="edit-event-id">
+                          <div>
+                            <label for="edit-event-title" class="text-sm font-medium text-slate-300">Titre de l'événement</label>
+                            <input type="text" id="edit-event-title" placeholder="Titre de l'événement" class="form-input mt-1" required>
+                          </div>
+                          <div class="flex justify-between items-center pt-4">
+                             <button type="button" id="delete-event-btn" class="btn btn-danger">Supprimer</button>
+                             <div>
+                                <button type="button" id="cancel-edit-modal-btn" class="btn btn-secondary mr-2">Annuler</button>
+                                <button type="submit" class="btn btn-primary">Sauvegarder</button>
+                             </div>
+                          </div>
+                        </form>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+            `;
+            renderPage('Planning des Interventions', content);
+
+            const calendarEl = document.getElementById('calendar');
+            const calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                headerToolbar: {
+                    left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay'
+                },
+                locale: 'fr', buttonText: { today: 'Aujourd\'hui', month: 'Mois', week: 'Semaine', day: 'Jour' },
+                editable: true,
+                droppable: true,
+                dateClick: function(info) {
+                    const modal = document.getElementById('event-modal');
+                    modal.classList.remove('hidden');
+                    document.getElementById('event-date').value = info.dateStr;
+                    document.getElementById('event-date-display').value = new Date(info.dateStr).toLocaleDateString('fr-FR');
+                    document.getElementById('add-event-form').reset();
+                },
+                eventClick: function(info) {
+                    if (info.event.extendedProps.isCustom) {
+                        const modal = document.getElementById('edit-event-modal');
+                        document.getElementById('edit-event-id').value = info.event.id;
+                        document.getElementById('edit-event-title').value = info.event.title;
+                        modal.classList.remove('hidden');
+                    } else {
+                        Toastify({
+                            text: `${info.event.title}`,
+                            duration: 3000,
+                            gravity: "top",
+                            position: "right",
+                            style: { background: "linear-gradient(to right, #334155, #475569)" }
+                        }).showToast();
+                    }
+                },
+                eventDrop: async (info) => {
+                    const eventData = info.event.extendedProps;
+                    if(eventData.isCustom) {
+                        const eventDocRef = doc(db, `artifacts/${appId}/public/data/customEvents`, info.event.id);
+                        try {
+                            await updateDoc(eventDocRef, { date: info.event.startStr });
+                            Toastify({ text: "Événement déplacé !", style: { background: "linear-gradient(to right, #10b981, #6ee7b7)" } }).showToast();
+                        } catch(e) {
+                            Toastify({ text: `Erreur`, className: "error", style: { background: "red" } }).showToast();
+                            info.revert();
+                        }
+                    } else if (info.event.extendedProps.isPreventive) {
+                        Toastify({ text: "Les tâches préventives ne peuvent pas être déplacées manuellement.", className: "error", style: { background: "orange" } }).showToast();
+                        info.revert();
+                    }
+                    else {
+                        const otDocRef = doc(db, `artifacts/${appId}/public/data/DI`, info.event.id);
+                        try {
+                            await updateDoc(otDocRef, { plannedAt: info.event.start, status: 'planifiée' });
+                            Toastify({ text: "Intervention replanifiée !", style: { background: "linear-gradient(to right, #10b981, #6ee7b7)" } }).showToast();
+                        } catch(e) {
+                            Toastify({ text: `Erreur de planification`, className: "error", style: { background: "red" } }).showToast();
+                            info.revert();
+                        }
+                    }
+                },
+                events: async (fetchInfo, successCallback, failureCallback) => {
+                    try {
+                        const otQuery = query(collection(db, `artifacts/${appId}/public/data/DI`), where("isOT", "==", true));
+                        const eventsQuery = query(collection(db, `artifacts/${appId}/public/data/customEvents`));
+                        const preventiveQuery = query(collection(db, `artifacts/${appId}/public/data/preventiveTasks`));
+                        
+                        const [otSnapshot, customEventsSnapshot, preventiveTasksSnapshot] = await Promise.all([
+                            getDocs(otQuery), 
+                            getDocs(eventsQuery),
+                            getDocs(preventiveQuery)
+                        ]);
+                        
+                        const otEvents = otSnapshot.docs.map(doc => {
+                            const data = doc.data();
+                            return {
+                                id: doc.id,
+                                title: `OT: ${data.type} - ${data.location}`,
+                                start: data.plannedAt?.toDate() || data.createdAt.toDate(), 
+                                allDay: true,
+                                backgroundColor: data.status === 'clôturée' ? '#10b981' : (data.status === 'planifiée' ? '#4f46e5' : '#f59e0b'),
+                                borderColor: data.status === 'clôturée' ? '#10b981' : (data.status === 'planifiée' ? '#4f46e5' : '#f59e0b'),
+                                extendedProps: { isCustom: false, isPreventive: false }
+                            }
+                        });
+                        
+                        const customEvents = customEventsSnapshot.docs.map(doc => {
+                            const data = doc.data();
+                            return {
+                                id: doc.id,
+                                title: data.title,
+                                start: data.date,
+                                allDay: true,
+                                backgroundColor: '#9333ea', // Purple for custom events
+                                borderColor: '#9333ea',
+                                extendedProps: { isCustom: true }
+                            }
+                        });
+
+                        const frequencyMap = {
+                            weekly: 'WEEKLY',
+                            monthly: 'MONTHLY',
+                            quarterly: 'MONTHLY',
+                            semestrial: 'MONTHLY',
+                            yearly: 'YEARLY'
+                        };
+                        const intervalMap = {
+                            quarterly: 3,
+                            semestrial: 6
+                        };
+
+                        const preventiveEvents = preventiveTasksSnapshot.docs.map(doc => {
+                            const task = doc.data();
+                            return {
+                                id: doc.id,
+                                title: `Préventif: ${task.description}`,
+                                rrule: {
+                                    freq: frequencyMap[task.frequency],
+                                    interval: intervalMap[task.frequency] || 1,
+                                    dtstart: task.startDate
+                                },
+                                allDay: true,
+                                backgroundColor: '#14b8a6', // Teal for preventive
+                                borderColor: '#14b8a6',
+                                extendedProps: { isPreventive: true }
+                            }
+                        });
+
+
+                        successCallback([...otEvents, ...customEvents, ...preventiveEvents]);
+                   } catch (e) { 
+                       console.error("Error fetching calendar events:", e);
+                       failureCallback(e); 
+                    }
+                }
+            });
+            calendar.render();
+
+            // --- Add Modal Listeners ---
+            document.getElementById('close-modal-btn').addEventListener('click', () => {
+                document.getElementById('event-modal').classList.add('hidden');
+            });
+            document.getElementById('add-event-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const eventData = {
+                    title: e.target['event-title'].value,
+                    date: e.target['event-date'].value,
+                    createdBy: userId,
+                    createdAt: serverTimestamp(),
+                };
+                try {
+                    await addDoc(collection(db, `artifacts/${appId}/public/data/customEvents`), eventData);
+                    Toastify({ text: "Événement ajouté !", style: { background: "linear-gradient(to right, #10b981, #6ee7b7)" } }).showToast();
+                    document.getElementById('event-modal').classList.add('hidden');
+                    e.target.reset();
+                    calendar.refetchEvents();
+                } catch (error) {
+                    Toastify({ text: `Erreur: ${error.message}`, className: "error", style: { background: "linear-gradient(to right, #ef4444, #f87171)" } }).showToast();
+                }
+            });
+
+            // --- Edit/Delete Modal Listeners ---
+            const editModal = document.getElementById('edit-event-modal');
+            
+            document.getElementById('cancel-edit-modal-btn').addEventListener('click', () => {
+                editModal.classList.add('hidden');
+            });
+
+            document.getElementById('edit-event-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const eventId = document.getElementById('edit-event-id').value;
+                const newTitle = document.getElementById('edit-event-title').value;
+                if (!eventId || !newTitle) return;
+                const eventDocRef = doc(db, `artifacts/${appId}/public/data/customEvents`, eventId);
+                try {
+                    await updateDoc(eventDocRef, { title: newTitle });
+                    Toastify({ text: "Événement mis à jour !", style: { background: "linear-gradient(to right, #10b981, #6ee7b7)" } }).showToast();
+                    editModal.classList.add('hidden');
+                    calendar.refetchEvents();
+                } catch (error) {
+                    Toastify({ text: `Erreur: ${error.message}`, className: "error", style: { background: "red" } }).showToast();
+                }
+            });
+
+            document.getElementById('delete-event-btn').addEventListener('click', () => {
+                const eventId = document.getElementById('edit-event-id').value;
+                openDeleteModal(eventId, 'event');
+            });
+        }
+        
+        async function deleteCalendarEvent(eventId) {
+            if (!eventId) return;
+            const eventDocRef = doc(db, `artifacts/${appId}/public/data/customEvents`, eventId);
+            try {
+                await deleteDoc(eventDocRef);
+                Toastify({ text: "Événement supprimé.", style: { background: "linear-gradient(to right, #ef4444, #f87171)" } }).showToast();
+                document.getElementById('delete-confirm-modal').classList.add('hidden');
+                document.getElementById('edit-event-modal').classList.add('hidden');
+                router(); // Force re-render of the calendar
+            } catch (error) {
+                Toastify({ text: `Erreur: ${error.message}`, className: "error", style: { background: "red" } }).showToast();
+            }
+        }
+
+        function renderUsersPage() {
+            if (userRole !== 'admin') {
+                renderPage('Accès non autorisé', '<p class="text-red-400">Vous n\'avez pas les droits pour accéder à cette page.</p>');
+                return;
+            }
+            const content = `<div class="bg-slate-800/70 border border-slate-700 rounded-xl p-6"><div id="users-list-container" class="space-y-4"></div></div>`;
+            renderPage('Gestion des Utilisateurs', content);
+
+            const usersCollectionRef = collection(db, `artifacts/${appId}/users`);
+            onSnapshot(usersCollectionRef, (snapshot) => {
+                const container = document.getElementById('users-list-container');
+                if (!container) return;
+                container.innerHTML = '';
+                snapshot.forEach(userDoc => {
+                    const userData = userDoc.data();
+                    const userCard = document.createElement('div');
+                    userCard.className = 'bg-slate-900/50 p-4 rounded-lg border border-slate-700 flex justify-between items-center';
+                    userCard.innerHTML = `
+                        <div>
+                            <p class="font-semibold text-white">${userData.email}</p>
+                            <p class="text-sm text-slate-400">Rôle actuel : ${userData.role}</p>
+                        </div>
+                        <select data-uid="${userDoc.id}" class="form-input w-48 change-role-select">
+                            <option value="demandeur" ${userData.role === 'demandeur' ? 'selected' : ''}>Demandeur</option>
+                            <option value="technicien" ${userData.role === 'technicien' ? 'selected' : ''}>Technicien</option>
+                            <option value="manager" ${userData.role === 'manager' ? 'selected' : ''}>Manager</option>
+                            <option value="admin" ${userData.role === 'admin' ? 'selected' : ''}>Admin</option>
+                        </select>
+                    `;
+                    container.appendChild(userCard);
+                });
+
+                document.querySelectorAll('.change-role-select').forEach(select => {
+                    select.addEventListener('change', async (e) => {
+                        const newRole = e.target.value;
+                        const uidToUpdate = e.target.dataset.uid;
+                        const userDocRef = doc(db, `artifacts/${appId}/users`, uidToUpdate);
+                        try {
+                           await updateDoc(userDocRef, { role: newRole });
+                           Toastify({text: "Rôle mis à jour !", style: { background: "linear-gradient(to right, #10b981, #6ee7b7)"}}).showToast();
+                        } catch (error) {
+                           Toastify({text: `Erreur: ${error.message}`, className: "error", style: { background: "red" }}).showToast();
+                        }
+                    });
+                });
+            });
+        }
+
+        function renderEquipmentsPage() {
+            if (userRole !== 'manager' && userRole !== 'admin' && userRole !== 'technicien') {
+                renderPage('Accès non autorisé', '<p class="text-red-400">Vous n\'avez pas les droits pour accéder à cette page.</p>');
+                return;
+            }
+            const content = `
+                <div class="bg-slate-800/70 border border-slate-700 rounded-xl p-6">
+                    <div class="flex justify-between items-center mb-4 flex-wrap gap-4">
+                        <h3 class="text-xl font-semibold text-white">Liste des équipements</h3>
+                        <div class="flex space-x-2">
+                            <button id="add-equipment-btn" class="btn btn-primary">Ajouter</button>
+                            <button id="filter-equipment-btn" class="btn btn-secondary">Filtrer</button>
+                            <button id="import-csv-btn" class="btn btn-secondary">Importer CSV</button>
+                            <button id="export-csv-btn" class="btn btn-success">Exporter CSV</button>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left text-slate-400">
+                            <thead class="text-xs text-slate-300 uppercase bg-slate-900/50">
+                                <tr>
+                                    <th scope="col" class="px-6 py-3">Désignation</th>
+                                    <th scope="col" class="px-6 py-3">Marque</th>
+                                    <th scope="col" class="px-6 py-3">N° Inventaire</th>
+                                    <th scope="col" class="px-6 py-3">Date d'acquisition</th>
+                                    <th scope="col" class="px-6 py-3">Fournisseur</th>
+                                    <th scope="col" class="px-6 py-3">Localisation</th>
+                                    <th scope="col" class="px-6 py-3 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="equipments-list-container">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Modals -->
+                <div id="filter-modal" class="fixed inset-0 bg-black bg-opacity-70 hidden z-50 flex items-center justify-center p-4">
+                    <div class="bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-lg border border-slate-700">
+                        <h3 class="text-lg font-medium mb-4 text-white">Filtrer les Équipements</h3>
+                        <form id="filter-form" class="space-y-4">
+                            <div><label for="filter-designation" class="text-sm font-medium text-slate-300">Désignation</label><input id="filter-designation" type="text" class="form-input mt-1"></div>
+                            <div><label for="filter-marque" class="text-sm font-medium text-slate-300">Marque</label><input id="filter-marque" type="text" class="form-input mt-1"></div>
+                            <div><label for="filter-localisation" class="text-sm font-medium text-slate-300">Localisation</label><input id="filter-localisation" type="text" class="form-input mt-1"></div>
+                            <div class="mt-6 flex justify-end space-x-2">
+                                <button type="button" id="cancel-filter-btn" class="btn btn-secondary">Annuler</button>
+                                <button type="button" id="clear-filter-btn" class="btn btn-warning">Effacer</button>
+                                <button type="submit" class="btn btn-primary">Appliquer</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <div id="equipment-modal" class="fixed inset-0 bg-black bg-opacity-70 hidden z-50 flex items-center justify-center overflow-y-auto p-4">
+                    <div class="bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-lg my-8 border border-slate-700">
+                        <h3 id="equipment-modal-title" class="text-lg font-medium mb-4 text-white">Ajouter un équipement</h3>
+                        <form id="equipment-form" class="space-y-3">
+                            <input type="hidden" id="equip-id">
+                            <div><label for="equip-inventaire" class="text-sm font-medium text-slate-300">N° Inventaire</label><input id="equip-inventaire" type="text" class="form-input mt-1"></div>
+                            <div><label for="equip-designation" class="text-sm font-medium text-slate-300">Désignation</label><input id="equip-designation" type="text" required class="form-input mt-1"></div>
+                            <div><label for="equip-marque" class="text-sm font-medium text-slate-300">Marque</label><input id="equip-marque" type="text" class="form-input mt-1"></div>
+                            <div><label for="equip-modele" class="text-sm font-medium text-slate-300">Modèle</label><input id="equip-modele" type="text" class="form-input mt-1"></div>
+                            <div><label for="equip-serie" class="text-sm font-medium text-slate-300">N° Série</label><input id="equip-serie" type="text" class="form-input mt-1"></div>
+                            <div><label for="equip-acquisition" class="text-sm font-medium text-slate-300">Date d'acquisition</label><input id="equip-acquisition" type="date" class="form-input mt-1"></div>
+                            <div><label for="equip-localisation" class="text-sm font-medium text-slate-300">Localisation</label><input id="equip-localisation" type="text" class="form-input mt-1"></div>
+                            <div><label for="equip-fournisseur" class="text-sm font-medium text-slate-300">Fournisseur</label><input id="equip-fournisseur" type="text" class="form-input mt-1"></div>
+                            <div class="mt-4 flex justify-end space-x-2">
+                                <button type="button" id="cancel-equip-btn" class="btn btn-secondary">Annuler</button>
+                                <button type="submit" class="btn btn-primary">Sauvegarder</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <div id="import-modal" class="fixed inset-0 bg-black bg-opacity-70 hidden z-50 flex items-center justify-center p-4">
+                    <div class="bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-2xl border border-slate-700">
+                        <h3 class="text-lg font-medium mb-2 text-white">Importer des données CSV</h3>
+                        <p class="text-sm text-slate-400 mb-4">Collez vos données ici. Les en-têtes doivent être: inventaire, designation, marque, modele, serie, acquisition, localisation, fournisseur</p>
+                        <textarea id="csv-data" class="form-input w-full h-40"></textarea>
+                        <div class="mt-4 flex justify-end space-x-2">
+                            <button id="cancel-import-btn" class="btn btn-secondary">Annuler</button>
+                            <button id="confirm-import-btn" class="btn btn-primary">Valider l'Import</button>
+                        </div>
+                    </div>
+                </div>
+                `;
+            renderPage('Gestion des Équipements', content);
+            
+            // --- Event Listeners ---
+            document.getElementById('add-equipment-btn').addEventListener('click', () => openEquipmentModal());
+            document.getElementById('cancel-equip-btn').addEventListener('click', closeEquipmentModal);
+            document.getElementById('equipment-form').addEventListener('submit', handleSaveEquipment);
+            
+            document.getElementById('filter-equipment-btn').addEventListener('click', () => {
+                document.getElementById('filter-modal').classList.remove('hidden');
+            });
+            document.getElementById('cancel-filter-btn').addEventListener('click', () => {
+                document.getElementById('filter-modal').classList.add('hidden');
+            });
+            document.getElementById('filter-form').addEventListener('submit', (e) => {
+                e.preventDefault();
+                applyFilters();
+                document.getElementById('filter-modal').classList.add('hidden');
+            });
+            document.getElementById('clear-filter-btn').addEventListener('click', () => {
+                document.getElementById('filter-form').reset();
+                applyFilters();
+                document.getElementById('filter-modal').classList.add('hidden');
+            });
+            
+            document.getElementById('import-csv-btn').addEventListener('click', () => document.getElementById('import-modal').classList.remove('hidden'));
+            document.getElementById('cancel-import-btn').addEventListener('click', () => document.getElementById('import-modal').classList.add('hidden'));
+            document.getElementById('confirm-import-btn').addEventListener('click', handleImportCSV);
+            document.getElementById('export-csv-btn').addEventListener('click', handleExportCSV);
+            
+            // Listener for table body clicks (edit/delete)
+            document.getElementById('equipments-list-container').addEventListener('click', (e) => {
+                const editBtn = e.target.closest('.edit-btn');
+                const deleteBtn = e.target.closest('.delete-btn');
+                if(editBtn) {
+                    openEquipmentModal(editBtn.dataset.id);
+                }
+                if(deleteBtn) {
+                    openDeleteModal(deleteBtn.dataset.id, 'equipment');
+                }
+            });
+
+            // Real-time listener for equipment
+            const equipmentsCollectionRef = collection(db, `artifacts/${appId}/public/data/equipements`);
+            onSnapshot(equipmentsCollectionRef, (snapshot) => {
+                allEquipments = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
+                applyFilters(); // Display with current filters applied
+            });
+        }
+        
+        function applyFilters() {
+            const designation = document.getElementById('filter-designation')?.value.toLowerCase() || '';
+            const marque = document.getElementById('filter-marque')?.value.toLowerCase() || '';
+            const localisation = document.getElementById('filter-localisation')?.value.toLowerCase() || '';
+
+            const filteredEquipments = allEquipments.filter(equip => {
+                const equipDesignation = (equip.designation || '').toLowerCase();
+                const equipMarque = (equip.marque || '').toLowerCase();
+                const equipLocalisation = (equip.localisation || '').toLowerCase();
+
+                return equipDesignation.includes(designation) &&
+                       equipMarque.includes(marque) &&
+                       equipLocalisation.includes(localisation);
+            });
+
+            displayEquipments(filteredEquipments);
+        }
+
+        function openEquipmentModal(id = null) {
+            const modal = document.getElementById('equipment-modal');
+            const form = document.getElementById('equipment-form');
+            const title = document.getElementById('equipment-modal-title');
+            form.reset();
+            document.getElementById('equip-id').value = '';
+
+            if (id) {
+                // Edit mode
+                title.textContent = "Modifier l'équipement";
+                const equip = allEquipments.find(e => e.id === id);
+                if(equip) {
+                    document.getElementById('equip-id').value = equip.id;
+                    document.getElementById('equip-inventaire').value = equip.inventaire || '';
+                    document.getElementById('equip-designation').value = equip.designation || '';
+                    document.getElementById('equip-marque').value = equip.marque || '';
+                    document.getElementById('equip-modele').value = equip.modele || '';
+                    document.getElementById('equip-serie').value = equip.serie || '';
+                    document.getElementById('equip-acquisition').value = equip.acquisition || '';
+                    document.getElementById('equip-localisation').value = equip.localisation || '';
+                    document.getElementById('equip-fournisseur').value = equip.fournisseur || '';
+                }
+            } else {
+                // Add mode
+                title.textContent = "Ajouter un équipement";
+            }
+            modal.classList.remove('hidden');
+        }
+
+        function closeEquipmentModal() {
+            document.getElementById('equipment-modal').classList.add('hidden');
+        }
+
+        async function handleSaveEquipment(e) {
+            e.preventDefault();
+            const id = document.getElementById('equip-id').value;
+            const equipData = {
+                inventaire: document.getElementById('equip-inventaire').value,
+                designation: document.getElementById('equip-designation').value,
+                marque: document.getElementById('equip-marque').value,
+                modele: document.getElementById('equip-modele').value,
+                serie: document.getElementById('equip-serie').value,
+                acquisition: document.getElementById('equip-acquisition').value,
+                localisation: document.getElementById('equip-localisation').value,
+                fournisseur: document.getElementById('equip-fournisseur').value,
+            };
+
+            try {
+                if (id) {
+                    // Update
+                    const docRef = doc(db, `artifacts/${appId}/public/data/equipements`, id);
+                    await updateDoc(docRef, equipData);
+                    Toastify({ text: "Équipement mis à jour !", style: { background: "linear-gradient(to right, #10b981, #6ee7b7)" } }).showToast();
+                } else {
+                    // Create
+                    equipData.createdAt = serverTimestamp();
+                    await addDoc(collection(db, `artifacts/${appId}/public/data/equipements`), equipData);
+                    Toastify({ text: "Équipement ajouté !", style: { background: "linear-gradient(to right, #10b981, #6ee7b7)" } }).showToast();
+                }
+                closeEquipmentModal();
+            } catch (error) {
+                Toastify({ text: `Erreur: ${error.message}`, className: "error", style: { background: "red" } }).showToast();
+            }
+        }
+
+        function openDeleteModal(id, type) {
+            const modal = document.getElementById('delete-confirm-modal');
+            const confirmBtn = modal.querySelector('#confirm-delete-btn');
+            
+            const handler = async () => {
+                if (type === 'equipment') await deleteEquipment(id);
+                else if (type === 'part') await deletePart(id);
+                else if (type === 'di') await handleDeleteDI(id);
+                else if (type === 'event') await deleteCalendarEvent(id);
+                else if (type === 'preventive') await deletePreventiveTask(id);
+                else if (type === 'contract') await deleteContract(id);
+            };
+            
+            // Clone and replace the button to ensure only one listener is attached
+            const newConfirmBtn = confirmBtn.cloneNode(true);
+            confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+            newConfirmBtn.addEventListener('click', handler);
+
+            modal.classList.remove('hidden');
+        }
+        
+        async function deleteEquipment(id) {
+            try {
+                await deleteDoc(doc(db, `artifacts/${appId}/public/data/equipements`, id));
+                Toastify({ text: "Équipement supprimé.", style: { background: "linear-gradient(to right, #ef4444, #f87171)" } }).showToast();
+                document.getElementById('delete-confirm-modal').classList.add('hidden');
+            } catch (error) {
+                Toastify({ text: `Erreur: ${error.message}`, className: "error", style: { background: "red" } }).showToast();
+            }
+        }
+
+        function displayEquipments(equipments) {
+            const container = document.getElementById('equipments-list-container');
+            if(!container) return;
+            container.innerHTML = ''; // Clear previous content
+            if(equipments.length === 0) {
+                container.innerHTML = '<tr><td colspan="7" class="text-center p-4 text-slate-500">Aucun équipement correspondant.</td></tr>';
+                return;
+            }
+            equipments.forEach(equip => {
+                const row = document.createElement('tr');
+                row.className = 'border-b border-slate-700 hover:bg-slate-800';
+                const val = (field) => field || '';
+
+                row.innerHTML = `
+                    <td class="px-6 py-4 font-medium text-white whitespace-nowrap">${val(equip.designation)}</td>
+                    <td class="px-6 py-4">${val(equip.marque)}</td>
+                    <td class="px-6 py-4">${val(equip.inventaire)}</td>
+                    <td class="px-6 py-4">${val(equip.acquisition)}</td>
+                    <td class="px-6 py-4">${val(equip.fournisseur)}</td>
+                    <td class="px-6 py-4">${val(equip.localisation)}</td>
+                    <td class="px-6 py-4 flex space-x-2 justify-end">
+                        <button data-id="${equip.id}" class="btn btn-warning edit-btn p-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                        </button>
+                        <button data-id="${equip.id}" class="btn btn-danger delete-btn p-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        </button>
+                    </td>
+                `;
+                container.appendChild(row);
+            });
+        }
+
+        async function handleImportCSV() {
+            const csvData = document.getElementById('csv-data').value;
+            if (!csvData) {
+                Toastify({text: "Veuillez coller des données CSV.", className: "error", style: { background: "orange" }}).showToast();
+                return;
+            }
+
+            try {
+                const workbook = XLSX.read(csvData, {type: 'string'});
+                const sheetName = workbook.SheetNames[0];
+                const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], {header: 1});
+                
+                if (jsonData.length < 2) {
+                    Toastify({text: "Le CSV est vide ou ne contient que les en-têtes.", className: "error", style: { background: "orange" }}).showToast();
+                    return;
+                }
+
+                const normalize = (str) => str ? String(str).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : '';
+                const headersFromCSV = jsonData[0].map(normalize);
+                const requiredHeaders = ['inventaire', 'designation', 'marque', 'modele', 'serie', 'acquisition', 'localisation', 'fournisseur'];
+                
+                const missingHeaders = requiredHeaders.filter(rh => !headersFromCSV.includes(rh));
+                if (missingHeaders.length > 0) {
+                    Toastify({text: `En-têtes manquants : ${missingHeaders.join(', ')}`, duration: 5000, className: "error", style: { background: "red" }}).showToast();
+                    return;
+                }
+                
+                const batch = writeBatch(db);
+                const rows = jsonData.slice(1);
+                
+                rows.forEach(row => {
+                    const equipData = {};
+                    requiredHeaders.forEach(requiredHeader => {
+                        const index = headersFromCSV.indexOf(requiredHeader);
+                        const cellValue = (index !== -1 && row[index] !== null && row[index] !== undefined) ? row[index] : '';
+                        equipData[requiredHeader] = cellValue;
+                    });
+                    
+                    equipData.createdAt = serverTimestamp();
+                    const docRef = doc(collection(db, `artifacts/${appId}/public/data/equipements`));
+                    batch.set(docRef, equipData);
+                });
+
+                await batch.commit();
+                Toastify({text: `${rows.length} équipement(s) importé(s) avec succès !`, style: { background: "linear-gradient(to right, #10b981, #6ee7b7)" }}).showToast();
+                document.getElementById('import-modal').classList.add('hidden');
+                document.getElementById('csv-data').value = '';
+
+            } catch (e) {
+                console.error("Erreur d'importation CSV: ", e);
+                Toastify({text: `Erreur d'importation: ${e.message}`, className: "error", style: { background: "red" }}).showToast();
+            }
+        }
+
+        function handleExportCSV() {
+            const dataToExport = allEquipments.map(e => ({
+                inventaire: e.inventaire || '',
+                designation: e.designation || '',
+                marque: e.marque || '',
+                modele: e.modele || '',
+                serie: e.serie || '',
+                acquisition: e.acquisition || '',
+                localisation: e.localisation || '',
+                fournisseur: e.fournisseur || ''
+            }));
+            
+            const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Equipements");
+            
+            XLSX.writeFile(workbook, "export_equipements.csv");
+            Toastify({text: "Exportation en cours...", style: { background: "linear-gradient(to right, #4f46e5, #6366f1)" }}).showToast();
+        }
+        
+        async function loadRecentDIs() {
+            const listContainer = document.getElementById('recent-di-list');
+            if (!listContainer) return;
+        
+            const q = (userRole === 'admin' || userRole === 'manager') 
+                ? query(collection(db, `artifacts/${appId}/public/data/DI`)) 
+                : query(collection(db, `artifacts/${appId}/public/data/DI`), where("demandeurId", "==", userId));
+
+            try {
+                const querySnapshot = await getDocs(q);
+                const sortedDocs = querySnapshot.docs.sort((a,b) => b.data().createdAt - a.data().createdAt);
+                listContainer.innerHTML = sortedDocs.length === 0 ? '<p class="text-slate-400">Aucune demande trouvée.</p>' : '';
+                sortedDocs.slice(0, 5).forEach((doc) => {
+                    const di = doc.data();
+                    const date = di.createdAt?.toDate().toLocaleDateString('fr-FR') || 'N/A';
+                    let statusColor = 'bg-blue-500/20 text-blue-300';
+                    if (di.status === 'en cours') statusColor = 'bg-yellow-500/20 text-yellow-300';
+                    if (di.status === 'clôturée') statusColor = 'bg-green-500/20 text-green-300';
+
+                    listContainer.innerHTML += `
+                        <div class="border-b border-slate-700 p-2 flex justify-between items-center last:border-b-0">
+                            <div>
+                                <p class="font-semibold text-slate-200">${di.type} à ${di.location}</p>
+                                <p class="text-sm text-slate-400">Par ${di.demandeurEmail} le ${date}</p>
+                            </div>
+                            <span class="text-xs font-semibold px-2 py-1 rounded-full ${statusColor}">${di.status}</span>
+                        </div>`;
+                });
+            } catch (error) {
+                listContainer.innerHTML = '<p class="text-red-400">Erreur de chargement.</p>';
+            }
+        }
+
+        function setup3dCardEffect() {
+            const cards = document.querySelectorAll('.card-3d');
+            cards.forEach(card => {
+                const container = card.parentElement;
+                container.addEventListener('mousemove', (e) => {
+                    const rect = card.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+                    const rotateY = -1 * ((x - rect.width / 2) / 20);
+                    const rotateX = (y - rect.height / 2) / 20;
+                    card.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.05, 1.05, 1.05)`;
+                });
+                container.addEventListener('mouseleave', () => {
+                    card.style.transform = 'rotateX(0) rotateY(0) scale3d(1, 1, 1)';
+                });
+            });
+        }
+
+        // --- PARTS MANAGEMENT FUNCTIONS ---
+        function renderPartsPage() {
+            if (userRole !== 'manager' && userRole !== 'admin' && userRole !== 'technicien') {
+                renderPage('Accès non autorisé', '<p class="text-red-400">Vous n\'avez pas les droits pour accéder à cette page.</p>');
+                return;
+            }
+            const content = `
+                <div class="bg-slate-800/70 border border-slate-700 rounded-xl p-6">
+                    <div class="flex justify-between items-center mb-4 flex-wrap gap-4">
+                        <h3 class="text-xl font-semibold text-white">Gestion des Pièces et Stocks</h3>
+                        <div class="flex space-x-2">
+                            <button id="add-part-btn" class="btn btn-primary">Ajouter une Pièce</button>
+                            <input type="text" id="parts-filter-input" class="form-input w-64" placeholder="Filtrer les pièces...">
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left text-slate-400">
+                            <thead class="text-xs text-slate-300 uppercase bg-slate-900/50">
+                                <tr>
+                                    <th scope="col" class="px-6 py-3">Désignation</th>
+                                    <th scope="col" class="px-6 py-3">Référence</th>
+                                    <th scope="col" class="px-6 py-3">Localisation</th>
+                                    <th scope="col" class="px-6 py-3 text-center">Stock Actuel</th>
+                                    <th scope="col" class="px-6 py-3 text-center">Stock Min.</th>
+                                    <th scope="col" class="px-6 py-3 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="parts-list-container">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Modal for adding/editing a part -->
+                <div id="part-modal" class="fixed inset-0 bg-black bg-opacity-70 hidden z-50 flex items-center justify-center overflow-y-auto p-4">
+                    <div class="bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-lg my-8 border border-slate-700">
+                        <h3 id="part-modal-title" class="text-lg font-medium mb-4 text-white">Ajouter une pièce</h3>
+                        <form id="part-form" class="space-y-4">
+                            <input type="hidden" id="part-id">
+                            <div><label for="part-designation" class="text-sm font-medium text-slate-300">Désignation</label><input id="part-designation" type="text" required class="form-input mt-1"></div>
+                            <div><label for="part-reference" class="text-sm font-medium text-slate-300">Référence / N° de série</label><input id="part-reference" type="text" class="form-input mt-1"></div>
+                            <div><label for="part-location" class="text-sm font-medium text-slate-300">Localisation</label><input id="part-location" type="text" class="form-input mt-1"></div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div><label for="part-stock" class="text-sm font-medium text-slate-300">Stock Actuel</label><input id="part-stock" type="number" min="0" required class="form-input mt-1"></div>
+                                <div><label for="part-stock-min" class="text-sm font-medium text-slate-300">Stock Minimum</label><input id="part-stock-min" type="number" min="0" required class="form-input mt-1"></div>
+                            </div>
+                            <div class="mt-6 flex justify-end space-x-2">
+                                <button type="button" id="cancel-part-btn" class="btn btn-secondary">Annuler</button>
+                                <button type="submit" class="btn btn-primary">Sauvegarder</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            `;
+            renderPage('Gestion des Pièces et Stocks', content);
+
+            // --- Event Listeners for Parts Page ---
+            document.getElementById('add-part-btn').addEventListener('click', () => openPartModal());
+            document.getElementById('cancel-part-btn').addEventListener('click', closePartModal);
+            document.getElementById('part-form').addEventListener('submit', handleSavePart);
+            document.getElementById('parts-filter-input').addEventListener('keyup', (e) => applyPartsFilter(e.target.value));
+            
+            // Real-time listener for parts
+            const partsCollectionRef = collection(db, `artifacts/${appId}/public/data/spareParts`);
+            onSnapshot(partsCollectionRef, (snapshot) => {
+                allParts = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
+                const filterValue = document.getElementById('parts-filter-input').value;
+                applyPartsFilter(filterValue);
+            });
+        }
+
+        function displayParts(parts) {
+            const container = document.getElementById('parts-list-container');
+            if(!container) return;
+            container.innerHTML = '';
+            if(parts.length === 0) {
+                container.innerHTML = '<tr><td colspan="6" class="text-center p-4 text-slate-500">Aucune pièce trouvée.</td></tr>';
+                return;
+            }
+            parts.forEach(part => {
+                const row = document.createElement('tr');
+                row.className = 'border-b border-slate-700 hover:bg-slate-800';
+                const val = (field) => field || '';
+                const stock = parseInt(part.stock, 10);
+                const stockMin = parseInt(part.stockMin, 10);
+                let stockColor = 'text-green-400';
+                if (stock < stockMin) {
+                    stockColor = 'text-red-400 font-bold';
+                } else if (stock <= stockMin * 1.2) { // Alert when stock is 20% above minimum
+                    stockColor = 'text-yellow-400';
+                }
+
+                row.innerHTML = `
+                    <td class="px-6 py-4 font-medium text-white whitespace-nowrap">${val(part.designation)}</td>
+                    <td class="px-6 py-4">${val(part.reference)}</td>
+                    <td class="px-6 py-4">${val(part.location)}</td>
+                    <td class="px-6 py-4 text-center ${stockColor}">${val(part.stock)}</td>
+                    <td class="px-6 py-4 text-center">${val(part.stockMin)}</td>
+                    <td class="px-6 py-4 flex space-x-2 justify-end">
+                        <button data-id="${part.id}" class="btn btn-warning edit-part-btn p-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                        </button>
+                        <button data-id="${part.id}" class="btn btn-danger delete-part-btn p-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        </button>
+                    </td>
+                `;
+                container.appendChild(row);
+            });
+
+            // Re-attach listeners for the new buttons
+            container.querySelectorAll('.edit-part-btn').forEach(btn => btn.addEventListener('click', (e) => openPartModal(e.currentTarget.dataset.id)));
+            container.querySelectorAll('.delete-part-btn').forEach(btn => btn.addEventListener('click', (e) => openDeleteModal(e.currentTarget.dataset.id, 'part')));
+        }
+
+        function applyPartsFilter(filterText = '') {
+            const text = filterText.toLowerCase();
+            const filteredParts = allParts.filter(part => 
+                (part.designation || '').toLowerCase().includes(text) ||
+                (part.reference || '').toLowerCase().includes(text) ||
+                (part.location || '').toLowerCase().includes(text)
+            );
+            displayParts(filteredParts);
+        }
+
+        function openPartModal(id = null) {
+            const modal = document.getElementById('part-modal');
+            const form = document.getElementById('part-form');
+            const title = document.getElementById('part-modal-title');
+            form.reset();
+            document.getElementById('part-id').value = '';
+
+            if (id) {
+                title.textContent = "Modifier la pièce";
+                const part = allParts.find(p => p.id === id);
+                if (part) {
+                    document.getElementById('part-id').value = part.id;
+                    document.getElementById('part-designation').value = part.designation || '';
+                    document.getElementById('part-reference').value = part.reference || '';
+                    document.getElementById('part-location').value = part.location || '';
+                    document.getElementById('part-stock').value = part.stock || 0;
+                    document.getElementById('part-stock-min').value = part.stockMin || 0;
+                }
+            } else {
+                title.textContent = "Ajouter une pièce";
+            }
+            modal.classList.remove('hidden');
+        }
+
+        function closePartModal() {
+            document.getElementById('part-modal').classList.add('hidden');
+        }
+
+        async function handleSavePart(e) {
+            e.preventDefault();
+            const id = document.getElementById('part-id').value;
+            const partData = {
+                designation: document.getElementById('part-designation').value,
+                reference: document.getElementById('part-reference').value,
+                location: document.getElementById('part-location').value,
+                stock: parseInt(document.getElementById('part-stock').value, 10) || 0,
+                stockMin: parseInt(document.getElementById('part-stock-min').value, 10) || 0,
+            };
+
+            try {
+                if (id) {
+                    const docRef = doc(db, `artifacts/${appId}/public/data/spareParts`, id);
+                    await updateDoc(docRef, partData);
+                    Toastify({ text: "Pièce mise à jour !", style: { background: "linear-gradient(to right, #10b981, #6ee7b7)" } }).showToast();
+                } else {
+                    partData.createdAt = serverTimestamp();
+                    await addDoc(collection(db, `artifacts/${appId}/public/data/spareParts`), partData);
+                    Toastify({ text: "Pièce ajoutée !", style: { background: "linear-gradient(to right, #10b981, #6ee7b7)" } }).showToast();
+                }
+                closePartModal();
+            } catch (error) {
+                Toastify({ text: `Erreur: ${error.message}`, className: "error", style: { background: "red" } }).showToast();
+            }
+        }
+
+        async function deletePart(id) {
+            try {
+                await deleteDoc(doc(db, `artifacts/${appId}/public/data/spareParts`, id));
+                Toastify({ text: "Pièce supprimée.", style: { background: "linear-gradient(to right, #ef4444, #f87171)" } }).showToast();
+                document.getElementById('delete-confirm-modal').classList.add('hidden');
+            } catch (error) {
+                Toastify({ text: `Erreur: ${error.message}`, className: "error", style: { background: "red" } }).showToast();
+            }
+        }
+
+        // --- PREVENTIVE MAINTENANCE FUNCTIONS ---
+        function renderPreventivePage() {
+            if (userRole !== 'manager' && userRole !== 'admin' && userRole !== 'technicien') {
+                renderPage('Accès non autorisé', '<p class="text-red-400">Vous n\'avez pas les droits pour accéder à cette page.</p>');
+                return;
+            }
+            const content = `
+                <div class="bg-slate-800/70 border border-slate-700 rounded-xl p-6">
+                    <div class="flex justify-between items-center mb-4 flex-wrap gap-4">
+                        <h3 class="text-xl font-semibold text-white">Tâches de Maintenance Préventive</h3>
+                        <button id="add-preventive-task-btn" class="btn btn-primary">Ajouter une Tâche</button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left text-slate-400">
+                            <thead class="text-xs text-slate-300 uppercase bg-slate-900/50">
+                                <tr>
+                                    <th scope="col" class="px-6 py-3">Tâche</th>
+                                    <th scope="col" class="px-6 py-3">Fréquence</th>
+                                    <th scope="col" class="px-6 py-3">Date de Début</th>
+                                    <th scope="col" class="px-6 py-3">Prochaine Échéance</th>
+                                    <th scope="col" class="px-6 py-3">Réalisé par</th>
+                                    <th scope="col" class="px-6 py-3 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="preventive-tasks-list-container">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Modal for adding/editing a preventive task -->
+                <div id="preventive-task-modal" class="fixed inset-0 bg-black bg-opacity-70 hidden z-50 flex items-center justify-center overflow-y-auto p-4">
+                    <div class="bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-lg my-8 border border-slate-700">
+                        <h3 id="preventive-task-modal-title" class="text-lg font-medium mb-4 text-white">Ajouter une Tâche Préventive</h3>
+                        <form id="preventive-task-form" class="space-y-4">
+                            <input type="hidden" id="preventive-task-id">
+                            <div>
+                                <label for="preventive-task-description" class="text-sm font-medium text-slate-300">Tâche / Description</label>
+                                <textarea id="preventive-task-description" rows="3" required class="form-input mt-1"></textarea>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label for="preventive-task-frequency" class="text-sm font-medium text-slate-300">Fréquence</label>
+                                    <select id="preventive-task-frequency" required class="form-input mt-1">
+                                        <option value="weekly">Hebdomadaire</option>
+                                        <option value="monthly">Mensuelle</option>
+                                        <option value="quarterly">Trimestrielle</option>
+                                        <option value="semestrial">Semestrielle</option>
+                                        <option value="yearly">Annuelle</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="preventive-task-start-date" class="text-sm font-medium text-slate-300">Date de début</label>
+                                    <input id="preventive-task-start-date" type="date" required class="form-input mt-1">
+                                </div>
+                            </div>
+                             <div>
+                                <label for="preventive-task-done-by" class="text-sm font-medium text-slate-300">Réalisé par</label>
+                                <select id="preventive-task-done-by" required class="form-input mt-1">
+                                    <option value="unit">Unité de maintenance</option>
+                                    <option value="provider">Prestataire</option>
+                                </select>
+                            </div>
+                            <div id="preventive-task-provider-container" class="hidden">
+                                <label for="preventive-task-provider-name" class="text-sm font-medium text-slate-300">Nom du Prestataire</label>
+                                <input id="preventive-task-provider-name" type="text" class="form-input mt-1">
+                            </div>
+                            <div class="mt-6 flex justify-end space-x-2">
+                                <button type="button" id="cancel-preventive-task-btn" class="btn btn-secondary">Annuler</button>
+                                <button type="submit" class="btn btn-primary">Sauvegarder</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            `;
+            renderPage('Maintenance Préventive', content);
+
+            // --- Event Listeners ---
+            document.getElementById('add-preventive-task-btn').addEventListener('click', () => openPreventiveTaskModal());
+            document.getElementById('cancel-preventive-task-btn').addEventListener('click', closePreventiveTaskModal);
+            document.getElementById('preventive-task-form').addEventListener('submit', handleSavePreventiveTask);
+            document.getElementById('preventive-task-done-by').addEventListener('change', (e) => {
+                document.getElementById('preventive-task-provider-container').classList.toggle('hidden', e.target.value !== 'provider');
+            });
+
+            // Real-time listener for preventive tasks
+            const preventiveTasksCollectionRef = collection(db, `artifacts/${appId}/public/data/preventiveTasks`);
+            onSnapshot(preventiveTasksCollectionRef, (snapshot) => {
+                allPreventiveTasks = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
+                displayPreventiveTasks(allPreventiveTasks);
+            });
+        }
+
+        function calculateNextDueDate(startDate, frequency) {
+            if (!startDate || !frequency) return null;
+            const date = new Date(startDate + 'T00:00:00'); // Ensure it's parsed as local time
+            switch (frequency) {
+                case 'weekly': date.setDate(date.getDate() + 7); break;
+                case 'monthly': date.setMonth(date.getMonth() + 1); break;
+                case 'quarterly': date.setMonth(date.getMonth() + 3); break;
+                case 'semestrial': date.setMonth(date.getMonth() + 6); break;
+                case 'yearly': date.setFullYear(date.getFullYear() + 1); break;
+                default: return null;
+            }
+            // Return in<x_bin_42>-MM-DD format
+            return date.toISOString().split('T')[0];
+        }
+
+        function displayPreventiveTasks(tasks) {
+            const container = document.getElementById('preventive-tasks-list-container');
+            if (!container) return;
+            container.innerHTML = '';
+            if (tasks.length === 0) {
+                container.innerHTML = '<tr><td colspan="6" class="text-center p-4 text-slate-500">Aucune tâche préventive programmée.</td></tr>';
+                return;
+            }
+            
+            const frequencyMap = {
+                weekly: 'Hebdomadaire',
+                monthly: 'Mensuelle',
+                quarterly: 'Trimestrielle',
+                semestrial: 'Semestrielle',
+                yearly: 'Annuelle'
+            };
+
+            tasks.sort((a,b) => new Date(a.startDate) - new Date(b.startDate)).forEach(task => {
+                const row = document.createElement('tr');
+                row.className = 'border-b border-slate-700 hover:bg-slate-800';
+                const val = (field) => field || '';
+                const nextDate = calculateNextDueDate(task.startDate, task.frequency);
+                
+                let doneByText = 'Unité de maintenance';
+                if (task.doneBy === 'provider') {
+                    doneByText = `Prestataire: ${task.providerName || 'N/A'}`;
+                }
+
+                row.innerHTML = `
+                    <td class="px-6 py-4 font-medium text-white whitespace-nowrap">${val(task.description)}</td>
+                    <td class="px-6 py-4">${frequencyMap[task.frequency] || val(task.frequency)}</td>
+                    <td class="px-6 py-4">${new Date(task.startDate + 'T00:00:00').toLocaleDateString('fr-FR')}</td>
+                    <td class="px-6 py-4">${nextDate ? new Date(nextDate + 'T00:00:00').toLocaleDateString('fr-FR') : 'N/A'}</td>
+                    <td class="px-6 py-4">${doneByText}</td>
+                    <td class="px-6 py-4 flex space-x-2 justify-end">
+                        <button data-id="${task.id}" class="btn btn-warning edit-preventive-btn p-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                        </button>
+                        <button data-id="${task.id}" class="btn btn-danger delete-preventive-btn p-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        </button>
+                    </td>
+                `;
+                container.appendChild(row);
+            });
+
+            // Re-attach listeners
+            container.querySelectorAll('.edit-preventive-btn').forEach(btn => btn.addEventListener('click', (e) => openPreventiveTaskModal(e.currentTarget.dataset.id)));
+            container.querySelectorAll('.delete-preventive-btn').forEach(btn => btn.addEventListener('click', (e) => openDeleteModal(e.currentTarget.dataset.id, 'preventive')));
+        }
+
+        function openPreventiveTaskModal(id = null) {
+            const modal = document.getElementById('preventive-task-modal');
+            const form = document.getElementById('preventive-task-form');
+            const title = document.getElementById('preventive-task-modal-title');
+            form.reset();
+            document.getElementById('preventive-task-id').value = '';
+            document.getElementById('preventive-task-provider-container').classList.add('hidden');
+
+            if (id) {
+                title.textContent = "Modifier la Tâche Préventive";
+                const task = allPreventiveTasks.find(t => t.id === id);
+                if (task) {
+                    document.getElementById('preventive-task-id').value = task.id;
+                    document.getElementById('preventive-task-description').value = task.description || '';
+                    document.getElementById('preventive-task-frequency').value = task.frequency || 'monthly';
+                    document.getElementById('preventive-task-start-date').value = task.startDate || '';
+                    document.getElementById('preventive-task-done-by').value = task.doneBy || 'unit';
+                    if (task.doneBy === 'provider') {
+                        document.getElementById('preventive-task-provider-container').classList.remove('hidden');
+                        document.getElementById('preventive-task-provider-name').value = task.providerName || '';
+                    }
+                }
+            } else {
+                title.textContent = "Ajouter une Tâche Préventive";
+            }
+            modal.classList.remove('hidden');
+        }
+
+        function closePreventiveTaskModal() {
+            document.getElementById('preventive-task-modal').classList.add('hidden');
+        }
+
+        async function handleSavePreventiveTask(e) {
+            e.preventDefault();
+            const id = document.getElementById('preventive-task-id').value;
+            const startDate = document.getElementById('preventive-task-start-date').value;
+
+            const taskData = {
+                description: document.getElementById('preventive-task-description').value,
+                frequency: document.getElementById('preventive-task-frequency').value,
+                startDate: startDate,
+                doneBy: document.getElementById('preventive-task-done-by').value,
+                providerName: document.getElementById('preventive-task-provider-name').value,
+            };
+
+            try {
+                if (id) { // Update existing task
+                    const taskDocRef = doc(db, `artifacts/${appId}/public/data/preventiveTasks`, id);
+                    await updateDoc(taskDocRef, taskData);
+                    Toastify({ text: "Tâche mise à jour !", style: { background: "linear-gradient(to right, #10b981, #6ee7b7)" } }).showToast();
+                } else { // Create new task
+                    taskData.createdAt = serverTimestamp();
+                    await addDoc(collection(db, `artifacts/${appId}/public/data/preventiveTasks`), taskData);
+                    Toastify({ text: "Tâche ajoutée !", style: { background: "linear-gradient(to right, #10b981, #6ee7b7)" } }).showToast();
+                }
+                closePreventiveTaskModal();
+                if(window.location.hash === '#/planning') router(); // Refresh calendar if on planning page
+            } catch (error) {
+                console.error("Error saving preventive task:", error);
+                Toastify({ text: `Erreur: ${error.message}`, className: "error", style: { background: "red" } }).showToast();
+            }
+        }
+
+        async function deletePreventiveTask(id) {
+            if (!id) return;
+            try {
+                const taskDocRef = doc(db, `artifacts/${appId}/public/data/preventiveTasks`, id);
+                await deleteDoc(taskDocRef);
+
+                Toastify({ text: "Tâche préventive supprimée.", style: { background: "linear-gradient(to right, #ef4444, #f87171)" } }).showToast();
+                document.getElementById('delete-confirm-modal').classList.add('hidden');
+                if(window.location.hash === '#/planning') router(); // Refresh calendar
+            } catch (error) {
+                Toastify({ text: `Erreur: ${error.message}`, className: "error", style: { background: "red" } }).showToast();
+            }
+        }
+
+        // --- CONTRACTS MANAGEMENT FUNCTIONS ---
+        let tempPeriods = []; // Temporary store for periods in the modal
+
+        function renderContractsPage() {
+            if (userRole !== 'manager' && userRole !== 'admin' && userRole !== 'technicien') {
+                renderPage('Accès non autorisé', '<p class="text-red-400">Vous n\'avez pas les droits pour accéder à cette page.</p>');
+                return;
+            }
+            const content = `
+                <div class="bg-slate-800/70 border border-slate-700 rounded-xl p-6">
+                    <div class="flex justify-between items-center mb-4 flex-wrap gap-4">
+                        <h3 class="text-xl font-semibold text-white">Gestion des Contrats et de la Sous-Traitance</h3>
+                        <button id="add-contract-btn" class="btn btn-primary">Ajouter un Contrat</button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left text-slate-400">
+                            <thead class="text-xs text-slate-300 uppercase bg-slate-900/50">
+                                <tr>
+                                    <th scope="col" class="px-6 py-3">Code</th>
+                                    <th scope="col" class="px-6 py-3">Nature</th>
+                                    <th scope="col" class="px-6 py-3">Type</th>
+                                    <th scope="col" class="px-6 py-3">Responsable</th>
+                                    <th scope="col" class="px-6 py-3">Fin de validité</th>
+                                    <th scope="col" class="px-6 py-3 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="contracts-list-container">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Modal for adding/editing a contract -->
+                <div id="contract-modal" class="fixed inset-0 bg-black bg-opacity-70 hidden z-50 flex items-center justify-center overflow-y-auto p-4">
+                    <div class="bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-3xl my-8 border border-slate-700">
+                        <h3 id="contract-modal-title" class="text-lg font-medium mb-4 text-white">Ajouter un contrat</h3>
+                        
+                        <div class="border-b border-slate-600 mb-4">
+                            <nav class="flex space-x-4" aria-label="Tabs">
+                                <button data-tab="general" class="contract-tab-btn text-indigo-400 border-b-2 border-indigo-400 px-3 py-2 text-sm font-medium">Infos Générales</button>
+                                <button data-tab="periods" class="contract-tab-btn text-slate-400 hover:text-white px-3 py-2 text-sm font-medium">Périodes</button>
+                                <button data-tab="equipment" class="contract-tab-btn text-slate-400 hover:text-white px-3 py-2 text-sm font-medium">Équipements</button>
+                            </nav>
+                        </div>
+
+                        <form id="contract-form" class="space-y-4">
+                            <input type="hidden" id="contract-id">
+
+                            <div id="contract-tab-general" class="contract-tab-content space-y-4">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div><label for="contract-code" class="text-sm font-medium text-slate-300">Code</label><input id="contract-code" type="text" required class="form-input mt-1"></div>
+                                    <div><label for="contract-nature" class="text-sm font-medium text-slate-300">Nature</label><input id="contract-nature" type="text" class="form-input mt-1"></div>
+                                    <div><label for="contract-responsable" class="text-sm font-medium text-slate-300">Responsable</label><input id="contract-responsable" type="text" class="form-input mt-1"></div>
+                                    <div><label for="contract-reference" class="text-sm font-medium text-slate-300">Référence</label><input id="contract-reference" type="text" class="form-input mt-1"></div>
+                                </div>
+                                <div><label for="contract-description" class="text-sm font-medium text-slate-300">Description / Conditions spéciales</label><textarea id="contract-description" rows="3" class="form-input mt-1"></textarea></div>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label for="contract-type" class="text-sm font-medium text-slate-300">Type de contrat</label>
+                                        <select id="contract-type" class="form-input mt-1"><option>Sous-traitance</option><option>Fourniture</option><option>Service</option></select>
+                                    </div>
+                                    <div>
+                                        <label for="contract-renewal" class="text-sm font-medium text-slate-300">Mode de renouvellement</label>
+                                        <select id="contract-renewal" class="form-input mt-1"><option>Manuel</option><option>Tacite reconduction</option></select>
+                                    </div>
+                                    <div><label for="contract-duration" class="text-sm font-medium text-slate-300">Durée</label><input id="contract-duration" type="text" placeholder="Ex: 1 an" class="form-input mt-1"></div>
+                                    <div><label for="contract-notice" class="text-sm font-medium text-slate-300">Préavis</label><input id="contract-notice" type="text" placeholder="Ex: 30 jours" class="form-input mt-1"></div>
+                                </div>
+                            </div>
+
+                            <div id="contract-tab-periods" class="contract-tab-content space-y-4 hidden">
+                                <div class="bg-slate-900/50 p-4 rounded-lg">
+                                    <h4 class="font-semibold mb-2">Ajouter une période</h4>
+                                    <div class="flex items-end space-x-2">
+                                        <div class="flex-1"><label for="period-start-date" class="text-xs font-medium text-slate-300">Date de début</label><input id="period-start-date" type="date" class="form-input mt-1"></div>
+                                        <div class="flex-1"><label for="period-end-date" class="text-xs font-medium text-slate-300">Date de fin</label><input id="period-end-date" type="date" class="form-input mt-1"></div>
+                                        <button type="button" id="add-period-btn" class="btn btn-secondary h-10">Ajouter</button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <h4 class="font-semibold mb-2">Périodes contractuelles</h4>
+                                    <div id="periods-list" class="space-y-2 max-h-48 overflow-y-auto p-2 border border-slate-700 rounded-md"></div>
+                                </div>
+                            </div>
+
+                            <div id="contract-tab-equipment" class="contract-tab-content space-y-4 hidden">
+                                 <h4 class="font-semibold mb-2">Équipements couverts par le contrat</h4>
+                                 <div id="contract-equipment-list" class="form-input h-64 overflow-y-auto p-2 space-y-2 border border-slate-700 rounded-md"></div>
+                            </div>
+                            
+                            <div class="mt-6 flex justify-end space-x-2 border-t border-slate-700 pt-4">
+                                <button type="button" id="cancel-contract-btn" class="btn btn-secondary">Annuler</button>
+                                <button type="submit" class="btn btn-primary">Sauvegarder</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            `;
+            renderPage('Gestion des Contrats', content);
+
+            // --- Event Listeners ---
+            document.getElementById('add-contract-btn').addEventListener('click', () => openContractModal());
+            document.getElementById('cancel-contract-btn').addEventListener('click', closeContractModal);
+            document.getElementById('contract-form').addEventListener('submit', handleSaveContract);
+            document.getElementById('add-period-btn').addEventListener('click', handleAddPeriod);
+            
+            document.querySelectorAll('.contract-tab-btn').forEach(btn => {
+                btn.addEventListener('click', () => switchContractTab(btn.dataset.tab));
+            });
+
+            // Listener for table body clicks (edit/delete)
+            document.getElementById('contracts-list-container').addEventListener('click', (e) => {
+                const editBtn = e.target.closest('.edit-contract-btn');
+                const deleteBtn = e.target.closest('.delete-contract-btn');
+                if(editBtn) openContractModal(editBtn.dataset.id);
+                if(deleteBtn) openDeleteModal(deleteBtn.dataset.id, 'contract');
+            });
+
+            // Real-time listener for contracts
+            const contractsCollectionRef = collection(db, `artifacts/${appId}/public/data/contracts`);
+            onSnapshot(contractsCollectionRef, (snapshot) => {
+                allContracts = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
+                displayContracts(allContracts);
+            });
+        }
+
+        function displayContracts(contracts) {
+            const container = document.getElementById('contracts-list-container');
+            if(!container) return;
+            container.innerHTML = '';
+            if(contracts.length === 0) {
+                container.innerHTML = '<tr><td colspan="6" class="text-center p-4 text-slate-500">Aucun contrat trouvé.</td></tr>';
+                return;
+            }
+            contracts.forEach(c => {
+                const row = document.createElement('tr');
+                row.className = 'border-b border-slate-700 hover:bg-slate-800';
+                const val = (field) => field || 'N/A';
+                const lastPeriod = c.periods && c.periods.length > 0 ? c.periods[c.periods.length - 1] : null;
+                const endDate = lastPeriod ? new Date(lastPeriod.end + 'T00:00:00').toLocaleDateString('fr-FR') : 'N/A';
+
+                row.innerHTML = `
+                    <td class="px-6 py-4 font-medium text-white whitespace-nowrap">${val(c.code)}</td>
+                    <td class="px-6 py-4">${val(c.nature)}</td>
+                    <td class="px-6 py-4">${val(c.typeContrat)}</td>
+                    <td class="px-6 py-4">${val(c.responsable)}</td>
+                    <td class="px-6 py-4">${endDate}</td>
+                    <td class="px-6 py-4 flex space-x-2 justify-end">
+                        <button data-id="${c.id}" class="btn btn-warning edit-contract-btn p-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                        </button>
+                        <button data-id="${c.id}" class="btn btn-danger delete-contract-btn p-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        </button>
+                    </td>
+                `;
+                container.appendChild(row);
+            });
+        }
+
+        function openContractModal(id = null) {
+            const modal = document.getElementById('contract-modal');
+            const form = document.getElementById('contract-form');
+            const title = document.getElementById('contract-modal-title');
+            form.reset();
+            document.getElementById('contract-id').value = '';
+            tempPeriods = [];
+            switchContractTab('general');
+
+            if (id) {
+                title.textContent = "Modifier le contrat";
+                const contract = allContracts.find(c => c.id === id);
+                if(contract) {
+                    document.getElementById('contract-id').value = contract.id;
+                    document.getElementById('contract-code').value = contract.code || '';
+                    document.getElementById('contract-nature').value = contract.nature || '';
+                    document.getElementById('contract-description').value = contract.description || '';
+                    document.getElementById('contract-responsable').value = contract.responsable || '';
+                    document.getElementById('contract-reference').value = contract.reference || '';
+                    document.getElementById('contract-type').value = contract.typeContrat || 'Sous-traitance';
+                    document.getElementById('contract-renewal').value = contract.modeRenouvellement || 'Manuel';
+                    document.getElementById('contract-duration').value = contract.duree || '';
+                    document.getElementById('contract-notice').value = contract.preavis || '';
+                    tempPeriods = contract.periods ? [...contract.periods] : [];
+                    populateEquipmentList(contract.linkedEquipmentIds || []);
+                }
+            } else {
+                title.textContent = "Ajouter un contrat";
+                populateEquipmentList([]);
+            }
+            renderPeriodsList();
+            modal.classList.remove('hidden');
+        }
+
+        function closeContractModal() {
+            document.getElementById('contract-modal').classList.add('hidden');
+        }
+
+        async function handleSaveContract(e) {
+            e.preventDefault();
+            const id = document.getElementById('contract-id').value;
+            const linkedEquipmentIds = Array.from(document.querySelectorAll('#contract-equipment-list input:checked')).map(cb => cb.value);
+
+            const contractData = {
+                code: document.getElementById('contract-code').value,
+                nature: document.getElementById('contract-nature').value,
+                description: document.getElementById('contract-description').value,
+                responsable: document.getElementById('contract-responsable').value,
+                reference: document.getElementById('contract-reference').value,
+                typeContrat: document.getElementById('contract-type').value,
+                modeRenouvellement: document.getElementById('contract-renewal').value,
+                duree: document.getElementById('contract-duration').value,
+                preavis: document.getElementById('contract-notice').value,
+                periods: tempPeriods,
+                linkedEquipmentIds: linkedEquipmentIds
+            };
+
+            try {
+                if (id) {
+                    const docRef = doc(db, `artifacts/${appId}/public/data/contracts`, id);
+                    await updateDoc(docRef, contractData);
+                    Toastify({ text: "Contrat mis à jour !", style: { background: "linear-gradient(to right, #10b981, #6ee7b7)" } }).showToast();
+                } else {
+                    contractData.createdAt = serverTimestamp();
+                    await addDoc(collection(db, `artifacts/${appId}/public/data/contracts`), contractData);
+                    Toastify({ text: "Contrat ajouté !", style: { background: "linear-gradient(to right, #10b981, #6ee7b7)" } }).showToast();
+                }
+                closeContractModal();
+            } catch (error) {
+                Toastify({ text: `Erreur: ${error.message}`, className: "error", style: { background: "red" } }).showToast();
+            }
+        }
+        
+        async function deleteContract(id) {
+            try {
+                await deleteDoc(doc(db, `artifacts/${appId}/public/data/contracts`, id));
+                Toastify({ text: "Contrat supprimé.", style: { background: "linear-gradient(to right, #ef4444, #f87171)" } }).showToast();
+                document.getElementById('delete-confirm-modal').classList.add('hidden');
+            } catch (error) {
+                Toastify({ text: `Erreur: ${error.message}`, className: "error", style: { background: "red" } }).showToast();
+            }
+        }
+
+        function switchContractTab(tabId) {
+            document.querySelectorAll('.contract-tab-content').forEach(tab => tab.classList.add('hidden'));
+            document.getElementById(`contract-tab-${tabId}`).classList.remove('hidden');
+
+            document.querySelectorAll('.contract-tab-btn').forEach(btn => {
+                btn.classList.remove('text-indigo-400', 'border-indigo-400');
+                btn.classList.add('text-slate-400', 'hover:text-white');
+            });
+            const activeBtn = document.querySelector(`.contract-tab-btn[data-tab="${tabId}"]`);
+            activeBtn.classList.add('text-indigo-400', 'border-indigo-400');
+            activeBtn.classList.remove('text-slate-400', 'hover:text-white');
+        }
+
+        function handleAddPeriod() {
+            const start = document.getElementById('period-start-date').value;
+            const end = document.getElementById('period-end-date').value;
+            if (start && end) {
+                tempPeriods.push({ start, end });
+                tempPeriods.sort((a, b) => new Date(a.start) - new Date(b.start));
+                renderPeriodsList();
+                document.getElementById('period-start-date').value = '';
+                document.getElementById('period-end-date').value = '';
+            } else {
+                Toastify({ text: "Veuillez remplir les deux dates.", className: "error", style: { background: "orange" } }).showToast();
+            }
+        }
+
+        function renderPeriodsList() {
+            const container = document.getElementById('periods-list');
+            container.innerHTML = '';
+            if (tempPeriods.length === 0) {
+                container.innerHTML = '<p class="text-slate-500 text-sm text-center p-2">Aucune période définie.</p>';
+                return;
+            }
+            tempPeriods.forEach((period, index) => {
+                const periodEl = document.createElement('div');
+                periodEl.className = 'bg-slate-800/70 p-2 rounded-md flex justify-between items-center';
+                periodEl.innerHTML = `
+                    <p class="text-sm">Du ${new Date(period.start+'T00:00:00').toLocaleDateString('fr-FR')} au ${new Date(period.end+'T00:00:00').toLocaleDateString('fr-FR')}</p>
+                    <button type="button" data-index="${index}" class="remove-period-btn text-red-400 hover:text-red-200">&times;</button>
+                `;
+                container.appendChild(periodEl);
+            });
+            document.querySelectorAll('.remove-period-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    tempPeriods.splice(e.target.dataset.index, 1);
+                    renderPeriodsList();
+                });
+            });
+        }
+
+        function populateEquipmentList(selectedIds = []) {
+            const container = document.getElementById('contract-equipment-list');
+            container.innerHTML = '';
+            if (allEquipments.length === 0) {
+                container.innerHTML = '<p class="text-slate-500 text-sm text-center p-2">Aucun équipement disponible.</p>';
+                return;
+            }
+            allEquipments.forEach(equip => {
+                const isChecked = selectedIds.includes(equip.id);
+                const label = document.createElement('label');
+                label.className = 'flex items-center space-x-3 p-2 rounded-md hover:bg-slate-700/50 cursor-pointer';
+                label.innerHTML = `
+                    <input type="checkbox" value="${equip.id}" ${isChecked ? 'checked' : ''} class="bg-slate-900 border-slate-600 text-indigo-500 focus:ring-indigo-500 rounded">
+                    <span class="text-slate-200">${equip.designation} (${equip.localisation || 'N/A'})</span>
+                `;
+                container.appendChild(label);
+            });
+        }
+
+        // --- APP START ---
+        window.addEventListener('hashchange', router);
+        initApp();
+
+    </script>
+</body>
+</html>
