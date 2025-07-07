@@ -1,6 +1,6 @@
 {
-  "name": "GMAO Pro - Gestion de Maintenance",
-  "short_name": "GMAO Pro",
+  "name": "GMAO IPM - Gestion de Maintenance",
+  "short_name": "GMAO IPM",
   "description": "Application de Gestion de Maintenance Assistée par Ordinateur",
   "start_url": ".",
   "display": "standalone",
