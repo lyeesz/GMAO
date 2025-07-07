@@ -1,10 +1,9 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <link rel="manifest" href="manifest.json">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GMAO Web App - 3D Dark Theme</title>
+    <title>GMAO IPM Web App </title>
 
     <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -792,9 +791,27 @@
         }
         
         function renderDIList() {
-            const content = `<div class="bg-slate-800/70 border border-slate-700 rounded-xl p-6"><div id="di-list-container" class="space-y-4"></div></div>`;
+            let allDIsForExport = []; // To hold the current list of DIs
+
+            const content = `
+                <div class="bg-slate-800/70 border border-slate-700 rounded-xl p-6">
+                    <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
+                        <h3 class="text-xl font-semibold text-white">Suivi des Demandes et OT</h3>
+                        <button id="export-interventions-btn" class="btn btn-success hidden">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                            </svg>
+                            Exporter la sélection
+                        </button>
+                    </div>
+                    <div id="di-list-container" class="space-y-4"></div>
+                </div>`;
             renderPage("Suivi des Demandes d'Intervention et OT", content);
             
+            document.getElementById('export-interventions-btn').addEventListener('click', () => {
+                handleExportInterventions(allDIsForExport);
+            });
+
             const diCollectionRef = collection(db, `artifacts/${appId}/public/data/DI`);
             const q = (userRole === 'admin' || userRole === 'manager' || userRole === 'technicien') 
                 ? query(diCollectionRef)
@@ -804,25 +821,30 @@
                 const listContainer = document.getElementById('di-list-container');
                 if(!listContainer) return;
                 
+                allDIsForExport = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
                 if (querySnapshot.empty) {
                     listContainer.innerHTML = '<p class="text-slate-400">Aucune demande d\'intervention pour le moment.</p>';
                     return;
                 }
                 
                 listContainer.innerHTML = '';
-                querySnapshot.docs.sort((a,b) => b.data().createdAt - a.data().createdAt).forEach((doc) => {
-                    const di = doc.data();
-                    const diId = doc.id;
-                    const date = di.createdAt?.toDate().toLocaleDateString('fr-FR') || 'N/A';
+                let hasCloturee = false;
+
+                allDIsForExport.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)).forEach((di) => {
+                    const diId = di.id;
+                    const date = di.createdAt?.toDate().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }) || 'N/A';
                     
                     let statusColor = 'bg-blue-500/20 text-blue-300';
                     if(di.isOT) statusColor = 'bg-purple-500/20 text-purple-300';
                     if (di.status === 'en cours') statusColor = 'bg-yellow-500/20 text-yellow-300';
-                    if (di.status === 'clôturée') statusColor = 'bg-green-500/20 text-green-300';
+                    if (di.status === 'clôturée') {
+                        statusColor = 'bg-green-500/20 text-green-300';
+                        hasCloturee = true;
+                    }
                     
                     const adminDeleteButton = (userRole === 'admin') ? `<button data-di-id="${diId}" class="delete-di-btn text-white bg-red-800 hover:bg-red-900 font-semibold py-1 px-3 text-sm rounded-md transition-colors mt-2">Supprimer</button>` : '';
 
-                    // Display used parts if available
                     let usedPartsHtml = '';
                     if (di.usedParts && di.usedParts.length > 0) {
                         const partsList = di.usedParts.map(p => `<li>${p.quantity} x ${p.partName}</li>`).join('');
@@ -836,14 +858,24 @@
                         `;
                     }
 
+                    const exportCheckbox = di.status === 'clôturée' ? `
+                        <div class="absolute top-3 right-3 z-10">
+                            <label class="flex items-center space-x-2 cursor-pointer p-2">
+                                <input type="checkbox" data-di-id="${diId}" class="export-di-checkbox bg-slate-700 border-slate-500 text-indigo-500 focus:ring-indigo-500 h-5 w-5 rounded">
+                            </label>
+                        </div>
+                    ` : '';
+
                     const card = document.createElement('div');
-                    card.className = 'bg-slate-900/50 p-4 rounded-lg border border-slate-700';
+                    card.className = 'bg-slate-900/50 p-4 rounded-lg border border-slate-700 relative';
                     card.innerHTML = `
+                        ${exportCheckbox}
                         <div class="flex justify-between items-start flex-wrap gap-4">
                             <div>
                                 <p class="font-bold text-lg text-white">${di.isOT ? 'OT' : 'DI'}: ${di.type} - ${di.location}</p>
                                 <p class="text-slate-300 mt-1">${di.description}</p>
                                 <p class="text-sm text-slate-500 mt-2">Demandé le: ${date} par ${di.demandeurEmail}</p>
+                                ${di.closedAt ? `<p class="text-sm text-slate-500">Clôturé le: ${di.closedAt.toDate().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })}</p>` : ''}
                             </div>
                             <div class="flex flex-col items-end space-y-2 flex-shrink-0">
                                <span class="text-sm font-semibold px-3 py-1 rounded-full ${statusColor}">${di.status}</span>
@@ -855,6 +887,8 @@
                         ${usedPartsHtml}`;
                     listContainer.appendChild(card);
                 });
+                
+                document.getElementById('export-interventions-btn').classList.toggle('hidden', !hasCloturee);
 
                 document.querySelectorAll('.create-ot-btn').forEach(button => {
                     button.addEventListener('click', (e) => openOtPartsModal(e.target.dataset.diId));
@@ -868,8 +902,75 @@
                     });
                 });
             }, (error) => {
+                 console.error("Error fetching DIs: ", error);
                  document.getElementById('di-list-container').innerHTML = '<p class="text-red-400">Impossible de charger les demandes.</p>';
             });
+        }
+
+        function handleExportInterventions(allDIs) {
+            const selectedIds = Array.from(document.querySelectorAll('.export-di-checkbox:checked')).map(cb => cb.dataset.diId);
+
+            if (selectedIds.length === 0) {
+                Toastify({ text: "Veuillez sélectionner au moins une intervention à exporter.", className: "warning", style: { background: "linear-gradient(to right, #f59e0b, #fbbf24)" } }).showToast();
+                return;
+            }
+
+            const dataToExport = allDIs
+                .filter(di => selectedIds.includes(di.id))
+                .map(di => {
+                    const formatDate = (timestamp) => {
+                        return timestamp ? timestamp.toDate().toLocaleString('fr-FR', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        }) : 'N/A';
+                    };
+
+                    const usedPartsString = (di.usedParts && di.usedParts.length > 0)
+                        ? di.usedParts.map(p => `${p.partName} (Qté: ${p.quantity})`).join(', ')
+                        : 'Aucune';
+
+                    return {
+                        'ID': di.id,
+                        'Type Intervention': di.isOT ? 'Ordre de Travail (OT)' : 'Demande d\'Intervention (DI)',
+                        'Statut': di.status,
+                        'Type Problème': di.type,
+                        'Localisation/Équipement': di.location,
+                        'Description': di.description,
+                        'Demandeur': di.demandeurEmail,
+                        'Date de Création': formatDate(di.createdAt),
+                        'Date de Clôture': formatDate(di.closedAt),
+                        'Pièces Utilisées': usedPartsString,
+                    };
+                });
+
+            if (dataToExport.length === 0) {
+                Toastify({ text: "Aucune donnée à exporter pour la sélection.", className: "error", style: { background: "red" } }).showToast();
+                return;
+            }
+            
+            const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Interventions Clôturées");
+            
+            // Auto-size columns for better readability
+            const objectMaxLength = [];
+            dataToExport.forEach(obj => {
+                Object.keys(obj).forEach((key, i) => {
+                    const len = (obj[key] || '').toString().length;
+                    objectMaxLength[i] = Math.max(objectMaxLength[i] || 0, len);
+                });
+            });
+            // Also consider header length
+            Object.keys(dataToExport[0]).forEach((key, i) => {
+                objectMaxLength[i] = Math.max(objectMaxLength[i], key.length);
+            });
+            worksheet["!cols"] = objectMaxLength.map(w => ({ wch: w + 2 })); // Add a little padding
+
+            XLSX.writeFile(workbook, "Export_Interventions_Cloturees.xlsx");
+            Toastify({text: "Exportation en cours...", style: { background: "linear-gradient(to right, #4f46e5, #6366f1)" }}).showToast();
         }
         
         async function openOtPartsModal(diId) {
@@ -965,7 +1066,10 @@
         async function closeOT(diId) {
             const diDocRef = doc(db, `artifacts/${appId}/public/data/DI`, diId);
              try {
-                await updateDoc(diDocRef, { status: 'clôturée' });
+                await updateDoc(diDocRef, { 
+                    status: 'clôturée',
+                    closedAt: serverTimestamp() // Add closing timestamp
+                });
                 Toastify({ text: "Intervention clôturée avec succès !", style: { background: "linear-gradient(to right, #10b981, #6ee7b7)" } }).showToast();
             } catch(e) {
                 Toastify({ text: `Erreur: ${e.message}`, className: "error", style: { background: "linear-gradient(to right, #ef4444, #f87171)" } }).showToast();
@@ -1992,7 +2096,7 @@
                 case 'yearly': date.setFullYear(date.getFullYear() + 1); break;
                 default: return null;
             }
-            // Return in<x_bin_42>-MM-DD format
+            // Return in yyyy-MM-dd format
             return date.toISOString().split('T')[0];
         }
 
