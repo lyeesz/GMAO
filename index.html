@@ -4,7 +4,7 @@
     <link rel="manifest" href="manifest.json">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GMAO IPM Web App </title>
+    <title>GMAO IPM Web App</title>
 
     <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -251,20 +251,43 @@
             }
         }
         
-        // --- AUTHENTICATION ---
+        // --- AUTHENTICATION & LOGGING ---
+        async function logActivity(action, details = {}) {
+            if (!currentUser) return;
+            try {
+                await addDoc(collection(db, `artifacts/${appId}/public/data/activityLogs`), {
+                    userId: currentUser.uid,
+                    userEmail: currentUser.email,
+                    userRole: userRole,
+                    action: action,
+                    details: details,
+                    timestamp: serverTimestamp()
+                });
+            } catch (error) {
+                console.error("Erreur de journalisation de l'activité:", error);
+            }
+        }
+
         function setupAuthListener() {
             onAuthStateChanged(auth, async (user) => {
                 if (user && !user.isAnonymous) {
+                    const isNewLogin = !currentUser;
                     currentUser = user;
                     userId = user.uid;
                     await fetchUserRole(user.uid);
-                    setupNotificationListener(); // Setup notifications after role is known
+                    if (isNewLogin) {
+                        await logActivity('login');
+                    }
+                    setupNotificationListener(); 
                     router(); 
                 } else {
+                    if (currentUser) { // Was logged in before
+                        logActivity('logout');
+                    }
                     currentUser = null;
                     userId = null;
                     userRole = null;
-                    if(notificationListenerUnsubscribe) notificationListenerUnsubscribe(); // Clean up listener on logout
+                    if(notificationListenerUnsubscribe) notificationListenerUnsubscribe();
                     renderLogin();
                 }
             });
@@ -277,16 +300,18 @@
                 if (docSnap.exists()) {
                     userRole = docSnap.data().role || 'demandeur';
                 } else {
+                    // This is a new user, create their profile
                     await setDoc(userDocRef, { 
                         email: currentUser.email, 
                         role: 'demandeur',
                         createdAt: serverTimestamp()
                     });
                     userRole = 'demandeur';
+                    await logActivity('register');
                 }
             } catch (error) {
                 console.error("Erreur lors de la récupération du rôle de l'utilisateur:", error);
-                userRole = 'demandeur';
+                userRole = 'demandeur'; // Default role on error
             }
         }
 
@@ -307,7 +332,8 @@
                 case '#/users': renderUsersPage(); break;
                 case '#/equipments': renderEquipmentsPage(); break;
                 case '#/parts': renderPartsPage(); break;
-                case '#/contracts': renderContractsPage(); break; // New Route
+                case '#/contracts': renderContractsPage(); break;
+                case '#/logs': renderLogsPage(); break; // New Route for Logs
                 default: renderDashboard();
             }
         }
@@ -417,13 +443,7 @@
             document.getElementById('register-form').addEventListener('submit', async (e) => {
                 e.preventDefault();
                 try {
-                    const userCredential = await createUserWithEmailAndPassword(auth, e.target['register-email'].value, e.target['register-password'].value);
-                    const userDocRef = doc(db, `artifacts/${appId}/users`, userCredential.user.uid);
-                    await setDoc(userDocRef, {
-                        email: userCredential.user.email,
-                        role: 'demandeur',
-                        createdAt: serverTimestamp()
-                    });
+                    await createUserWithEmailAndPassword(auth, e.target['register-email'].value, e.target['register-password'].value);
                     Toastify({ text: "Inscription réussie ! Vous pouvez vous connecter.", className: "info", style: { background: "linear-gradient(to right, #10b981, #6ee7b7)" } }).showToast();
                 } catch (error) {
                     Toastify({ text: `Erreur: ${error.message}`, className: "error", style: { background: "linear-gradient(to right, #ef4444, #f87171)" } }).showToast();
@@ -471,6 +491,9 @@
                 navLinks += `<a href="#/users" class="${hash === '#/users' ? activeLinkClasses : linkClasses}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" /></svg>
                     <span>Utilisateurs</span></a>`;
+                navLinks += `<a href="#/logs" class="${hash === '#/logs' ? activeLinkClasses : linkClasses}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.05 3.05a7 7 0 119.9 9.9L10 18.9l-4.95-5.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd" /></svg>
+                    <span>Logs</span></a>`;
             }
 
             return `
@@ -782,7 +805,8 @@
                     usedParts: []
                 };
                 try {
-                    await addDoc(collection(db, `artifacts/${appId}/public/data/DI`), diData);
+                    const docRef = await addDoc(collection(db, `artifacts/${appId}/public/data/DI`), diData);
+                    await logActivity('create_di', { diId: docRef.id, description: diData.description });
                     Toastify({ text: "Demande créée avec succès !", style: { background: "linear-gradient(to right, #10b981, #6ee7b7)" } }).showToast();
                     window.location.hash = '#/di/list';
                 } catch (error) {
@@ -971,6 +995,7 @@
             worksheet["!cols"] = objectMaxLength.map(w => ({ wch: w + 2 })); // Add a little padding
 
             XLSX.writeFile(workbook, "Export_Interventions_Cloturees.xlsx");
+            logActivity('export_interventions', { count: dataToExport.length });
             Toastify({text: "Exportation en cours...", style: { background: "linear-gradient(to right, #4f46e5, #6366f1)" }}).showToast();
         }
         
@@ -1057,7 +1082,8 @@
 
                 batch.update(diDocRef, updateData);
                 await batch.commit();
-
+                
+                await logActivity('create_ot', { diId: diId });
                 Toastify({ text: "OT créé avec succès !", style: { background: "linear-gradient(to right, #4f46e5, #6366f1)" } }).showToast();
             } catch(e) {
                 Toastify({ text: `Erreur création OT: ${e.message}`, className: "error", style: { background: "linear-gradient(to right, #ef4444, #f87171)" } }).showToast();
@@ -1071,6 +1097,7 @@
                     status: 'clôturée',
                     closedAt: serverTimestamp() // Add closing timestamp
                 });
+                await logActivity('close_ot', { diId: diId });
                 Toastify({ text: "Intervention clôturée avec succès !", style: { background: "linear-gradient(to right, #10b981, #6ee7b7)" } }).showToast();
             } catch(e) {
                 Toastify({ text: `Erreur: ${e.message}`, className: "error", style: { background: "linear-gradient(to right, #ef4444, #f87171)" } }).showToast();
@@ -1086,6 +1113,7 @@
             const diDocRef = doc(db, `artifacts/${appId}/public/data/DI`, diId);
             try {
                 await deleteDoc(diDocRef);
+                await logActivity('delete_di', { diId: diId });
                 Toastify({ text: "Demande/OT supprimé(e).", style: { background: "linear-gradient(to right, #ef4444, #f87171)" } }).showToast();
                 document.getElementById('delete-confirm-modal').classList.add('hidden');
             } catch (error) {
@@ -1186,6 +1214,7 @@
                         const eventDocRef = doc(db, `artifacts/${appId}/public/data/customEvents`, info.event.id);
                         try {
                             await updateDoc(eventDocRef, { date: info.event.startStr });
+                            await logActivity('move_calendar_event', { eventId: info.event.id, newDate: info.event.startStr });
                             Toastify({ text: "Événement déplacé !", style: { background: "linear-gradient(to right, #10b981, #6ee7b7)" } }).showToast();
                         } catch(e) {
                             Toastify({ text: `Erreur`, className: "error", style: { background: "red" } }).showToast();
@@ -1199,6 +1228,7 @@
                         const otDocRef = doc(db, `artifacts/${appId}/public/data/DI`, info.event.id);
                         try {
                             await updateDoc(otDocRef, { plannedAt: info.event.start, status: 'planifiée' });
+                            await logActivity('replan_ot', { otId: info.event.id, newDate: info.event.startStr });
                             Toastify({ text: "Intervention replanifiée !", style: { background: "linear-gradient(to right, #10b981, #6ee7b7)" } }).showToast();
                         } catch(e) {
                             Toastify({ text: `Erreur de planification`, className: "error", style: { background: "red" } }).showToast();
@@ -1296,7 +1326,8 @@
                     createdAt: serverTimestamp(),
                 };
                 try {
-                    await addDoc(collection(db, `artifacts/${appId}/public/data/customEvents`), eventData);
+                    const docRef = await addDoc(collection(db, `artifacts/${appId}/public/data/customEvents`), eventData);
+                    await logActivity('create_calendar_event', { eventId: docRef.id, title: eventData.title });
                     Toastify({ text: "Événement ajouté !", style: { background: "linear-gradient(to right, #10b981, #6ee7b7)" } }).showToast();
                     document.getElementById('event-modal').classList.add('hidden');
                     e.target.reset();
@@ -1321,6 +1352,7 @@
                 const eventDocRef = doc(db, `artifacts/${appId}/public/data/customEvents`, eventId);
                 try {
                     await updateDoc(eventDocRef, { title: newTitle });
+                    await logActivity('edit_calendar_event', { eventId: eventId, newTitle: newTitle });
                     Toastify({ text: "Événement mis à jour !", style: { background: "linear-gradient(to right, #10b981, #6ee7b7)" } }).showToast();
                     editModal.classList.add('hidden');
                     calendar.refetchEvents();
@@ -1340,6 +1372,7 @@
             const eventDocRef = doc(db, `artifacts/${appId}/public/data/customEvents`, eventId);
             try {
                 await deleteDoc(eventDocRef);
+                await logActivity('delete_calendar_event', { eventId: eventId });
                 Toastify({ text: "Événement supprimé.", style: { background: "linear-gradient(to right, #ef4444, #f87171)" } }).showToast();
                 document.getElementById('delete-confirm-modal').classList.add('hidden');
                 document.getElementById('edit-event-modal').classList.add('hidden');
@@ -1388,6 +1421,7 @@
                         const userDocRef = doc(db, `artifacts/${appId}/users`, uidToUpdate);
                         try {
                            await updateDoc(userDocRef, { role: newRole });
+                           await logActivity('change_user_role', { targetUserId: uidToUpdate, newRole: newRole });
                            Toastify({text: "Rôle mis à jour !", style: { background: "linear-gradient(to right, #10b981, #6ee7b7)"}}).showToast();
                         } catch (error) {
                            Toastify({text: `Erreur: ${error.message}`, className: "error", style: { background: "red" }}).showToast();
@@ -1601,11 +1635,13 @@
                     // Update
                     const docRef = doc(db, `artifacts/${appId}/public/data/equipements`, id);
                     await updateDoc(docRef, equipData);
+                    await logActivity('edit_equipment', { equipmentId: id, designation: equipData.designation });
                     Toastify({ text: "Équipement mis à jour !", style: { background: "linear-gradient(to right, #10b981, #6ee7b7)" } }).showToast();
                 } else {
                     // Create
                     equipData.createdAt = serverTimestamp();
-                    await addDoc(collection(db, `artifacts/${appId}/public/data/equipements`), equipData);
+                    const docRef = await addDoc(collection(db, `artifacts/${appId}/public/data/equipements`), equipData);
+                    await logActivity('create_equipment', { equipmentId: docRef.id, designation: equipData.designation });
                     Toastify({ text: "Équipement ajouté !", style: { background: "linear-gradient(to right, #10b981, #6ee7b7)" } }).showToast();
                 }
                 closeEquipmentModal();
@@ -1638,6 +1674,7 @@
         async function deleteEquipment(id) {
             try {
                 await deleteDoc(doc(db, `artifacts/${appId}/public/data/equipements`, id));
+                await logActivity('delete_equipment', { equipmentId: id });
                 Toastify({ text: "Équipement supprimé.", style: { background: "linear-gradient(to right, #ef4444, #f87171)" } }).showToast();
                 document.getElementById('delete-confirm-modal').classList.add('hidden');
             } catch (error) {
@@ -1722,6 +1759,7 @@
                 });
 
                 await batch.commit();
+                await logActivity('import_equipments_csv', { count: rows.length });
                 Toastify({text: `${rows.length} équipement(s) importé(s) avec succès !`, style: { background: "linear-gradient(to right, #10b981, #6ee7b7)" }}).showToast();
                 document.getElementById('import-modal').classList.add('hidden');
                 document.getElementById('csv-data').value = '';
@@ -1749,6 +1787,7 @@
             XLSX.utils.book_append_sheet(workbook, worksheet, "Equipements");
             
             XLSX.writeFile(workbook, "export_equipements.csv");
+            logActivity('export_equipments_csv', { count: dataToExport.length });
             Toastify({text: "Exportation en cours...", style: { background: "linear-gradient(to right, #4f46e5, #6366f1)" }}).showToast();
         }
         
@@ -1971,10 +2010,12 @@
                 if (id) {
                     const docRef = doc(db, `artifacts/${appId}/public/data/spareParts`, id);
                     await updateDoc(docRef, partData);
+                    await logActivity('edit_part', { partId: id, designation: partData.designation });
                     Toastify({ text: "Pièce mise à jour !", style: { background: "linear-gradient(to right, #10b981, #6ee7b7)" } }).showToast();
                 } else {
                     partData.createdAt = serverTimestamp();
-                    await addDoc(collection(db, `artifacts/${appId}/public/data/spareParts`), partData);
+                    const docRef = await addDoc(collection(db, `artifacts/${appId}/public/data/spareParts`), partData);
+                    await logActivity('create_part', { partId: docRef.id, designation: partData.designation });
                     Toastify({ text: "Pièce ajoutée !", style: { background: "linear-gradient(to right, #10b981, #6ee7b7)" } }).showToast();
                 }
                 closePartModal();
@@ -1986,6 +2027,7 @@
         async function deletePart(id) {
             try {
                 await deleteDoc(doc(db, `artifacts/${appId}/public/data/spareParts`, id));
+                await logActivity('delete_part', { partId: id });
                 Toastify({ text: "Pièce supprimée.", style: { background: "linear-gradient(to right, #ef4444, #f87171)" } }).showToast();
                 document.getElementById('delete-confirm-modal').classList.add('hidden');
             } catch (error) {
@@ -2097,7 +2139,7 @@
                 case 'yearly': date.setFullYear(date.getFullYear() + 1); break;
                 default: return null;
             }
-            // Return in yyyy-MM-dd format
+            // Return in format
             return date.toISOString().split('T')[0];
         }
 
@@ -2201,10 +2243,12 @@
                 if (id) { // Update existing task
                     const taskDocRef = doc(db, `artifacts/${appId}/public/data/preventiveTasks`, id);
                     await updateDoc(taskDocRef, taskData);
+                    await logActivity('edit_preventive_task', { taskId: id, description: taskData.description });
                     Toastify({ text: "Tâche mise à jour !", style: { background: "linear-gradient(to right, #10b981, #6ee7b7)" } }).showToast();
                 } else { // Create new task
                     taskData.createdAt = serverTimestamp();
-                    await addDoc(collection(db, `artifacts/${appId}/public/data/preventiveTasks`), taskData);
+                    const docRef = await addDoc(collection(db, `artifacts/${appId}/public/data/preventiveTasks`), taskData);
+                    await logActivity('create_preventive_task', { taskId: docRef.id, description: taskData.description });
                     Toastify({ text: "Tâche ajoutée !", style: { background: "linear-gradient(to right, #10b981, #6ee7b7)" } }).showToast();
                 }
                 closePreventiveTaskModal();
@@ -2220,6 +2264,7 @@
             try {
                 const taskDocRef = doc(db, `artifacts/${appId}/public/data/preventiveTasks`, id);
                 await deleteDoc(taskDocRef);
+                await logActivity('delete_preventive_task', { taskId: id });
 
                 Toastify({ text: "Tâche préventive supprimée.", style: { background: "linear-gradient(to right, #ef4444, #f87171)" } }).showToast();
                 document.getElementById('delete-confirm-modal').classList.add('hidden');
@@ -2450,10 +2495,12 @@
                 if (id) {
                     const docRef = doc(db, `artifacts/${appId}/public/data/contracts`, id);
                     await updateDoc(docRef, contractData);
+                    await logActivity('edit_contract', { contractId: id, code: contractData.code });
                     Toastify({ text: "Contrat mis à jour !", style: { background: "linear-gradient(to right, #10b981, #6ee7b7)" } }).showToast();
                 } else {
                     contractData.createdAt = serverTimestamp();
-                    await addDoc(collection(db, `artifacts/${appId}/public/data/contracts`), contractData);
+                    const docRef = await addDoc(collection(db, `artifacts/${appId}/public/data/contracts`), contractData);
+                    await logActivity('create_contract', { contractId: docRef.id, code: contractData.code });
                     Toastify({ text: "Contrat ajouté !", style: { background: "linear-gradient(to right, #10b981, #6ee7b7)" } }).showToast();
                 }
                 closeContractModal();
@@ -2465,6 +2512,7 @@
         async function deleteContract(id) {
             try {
                 await deleteDoc(doc(db, `artifacts/${appId}/public/data/contracts`, id));
+                await logActivity('delete_contract', { contractId: id });
                 Toastify({ text: "Contrat supprimé.", style: { background: "linear-gradient(to right, #ef4444, #f87171)" } }).showToast();
                 document.getElementById('delete-confirm-modal').classList.add('hidden');
             } catch (error) {
@@ -2539,6 +2587,63 @@
                     <span class="text-slate-200">${equip.designation} (${equip.localisation || 'N/A'})</span>
                 `;
                 container.appendChild(label);
+            });
+        }
+
+        // --- LOGS PAGE ---
+        function renderLogsPage() {
+            if (userRole !== 'admin') {
+                renderPage('Accès non autorisé', '<p class="text-red-400">Vous n\'avez pas les droits pour accéder à cette page.</p>');
+                return;
+            }
+            const content = `
+                <div class="bg-slate-800/70 border border-slate-700 rounded-xl p-6">
+                    <h3 class="text-xl font-semibold text-white mb-4">Journal d'Activité</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left text-slate-400">
+                            <thead class="text-xs text-slate-300 uppercase bg-slate-900/50">
+                                <tr>
+                                    <th scope="col" class="px-6 py-3">Date</th>
+                                    <th scope="col" class="px-6 py-3">Utilisateur</th>
+                                    <th scope="col" class="px-6 py-3">Rôle</th>
+                                    <th scope="col" class="px-6 py-3">Action</th>
+                                    <th scope="col" class="px-6 py-3">Détails</th>
+                                </tr>
+                            </thead>
+                            <tbody id="logs-list-container">
+                                <tr><td colspan="5" class="text-center p-4">Chargement des logs...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>`;
+            renderPage('Logs d\'Activité', content);
+            
+            const logsCollectionRef = collection(db, `artifacts/${appId}/public/data/activityLogs`);
+            onSnapshot(query(logsCollectionRef), (snapshot) => {
+                const container = document.getElementById('logs-list-container');
+                if (!container) return;
+                container.innerHTML = '';
+                if (snapshot.empty) {
+                    container.innerHTML = '<tr><td colspan="5" class="text-center p-4 text-slate-500">Aucun log trouvé.</td></tr>';
+                    return;
+                }
+                
+                snapshot.docs.sort((a, b) => b.data().timestamp - a.data().timestamp).forEach(doc => {
+                    const log = doc.data();
+                    const row = document.createElement('tr');
+                    row.className = 'border-b border-slate-700 hover:bg-slate-800';
+                    const date = log.timestamp?.toDate().toLocaleString('fr-FR') || 'N/A';
+                    const details = JSON.stringify(log.details, null, 2);
+
+                    row.innerHTML = `
+                        <td class="px-6 py-4 whitespace-nowrap">${date}</td>
+                        <td class="px-6 py-4 font-medium text-white">${log.userEmail}</td>
+                        <td class="px-6 py-4">${log.userRole}</td>
+                        <td class="px-6 py-4">${log.action}</td>
+                        <td class="px-6 py-4"><pre class="text-xs whitespace-pre-wrap">${details}</pre></td>
+                    `;
+                    container.appendChild(row);
+                });
             });
         }
 
