@@ -36,6 +36,7 @@
         body {
             font-family: 'Inter', sans-serif;
             background-color: #0f172a; /* bg-slate-900 */
+            overscroll-behavior: none;
         }
         
         /* A subtle pattern for the background */
@@ -96,6 +97,7 @@
              align-items: center;
              justify-content: center;
              color: white;
+             cursor: pointer;
         }
         .btn-primary { background-color: #4f46e5; }
         .btn-primary:hover { background-color: #4338ca; }
@@ -137,6 +139,11 @@
         }
         .fc-event {
             cursor: pointer;
+        }
+
+        /* Mobile sidebar transition */
+        #mobile-sidebar {
+            transition: transform 0.3s ease-in-out;
         }
     </style>
 </head>
@@ -323,6 +330,9 @@
                 return;
             }
             
+            // Close mobile sidebar on navigation
+            closeMobileSidebar();
+
             switch(hash) {
                 case '#/dashboard': renderDashboard(); break;
                 case '#/di/new': renderDIForm(); break;
@@ -399,7 +409,7 @@
         // --- APP VIEWS ---
         function renderLogin() {
             document.getElementById('app-container').innerHTML = `
-                <div class="flex items-center justify-center min-h-screen bg-slate-900 bg-pattern">
+                <div class="flex items-center justify-center min-h-screen bg-slate-900 bg-pattern p-4">
                     <div class="w-full max-w-md p-8 space-y-6 bg-slate-800/50 backdrop-blur-sm rounded-2xl shadow-2xl border border-slate-700">
                         <h2 class="text-3xl font-bold text-center text-white">GMAO-IPM</h2>
                         <form id="login-form" class="space-y-4">
@@ -451,7 +461,7 @@
             });
         }
 
-        function renderSidebar() {
+        function getNavLinks() {
             const hash = window.location.hash || '#/dashboard';
             const linkClasses = "flex items-center space-x-3 px-4 py-2 rounded-lg hover:bg-slate-700 transition-colors duration-200";
             const activeLinkClasses = "flex items-center space-x-3 px-4 py-2 rounded-lg bg-indigo-600 text-white font-semibold shadow-lg";
@@ -495,8 +505,11 @@
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.05 3.05a7 7 0 119.9 9.9L10 18.9l-4.95-5.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd" /></svg>
                     <span>Logs</span></a>`;
             }
+            return navLinks;
+        }
 
-            return `
+        function renderSidebar() {
+             return `
                 <aside class="w-64 bg-slate-800/50 backdrop-blur-sm p-6 flex-col justify-between hidden md:flex">
                     <div>
                         <div class="flex items-center space-x-3 mb-10">
@@ -505,7 +518,7 @@
                             </div>
                             <h1 class="text-xl font-bold">GMAO Pro</h1>
                         </div>
-                        <nav class="flex flex-col space-y-2">${navLinks}</nav>
+                        <nav class="flex flex-col space-y-2">${getNavLinks()}</nav>
                     </div>
                     <div>
                         <div class="text-xs text-slate-400 mb-2 truncate">${currentUser.email}</div>
@@ -515,6 +528,56 @@
                         </button>
                     </div>
                 </aside>`;
+        }
+
+        function renderMobileSidebar() {
+            return `
+                <!-- Overlay for mobile sidebar -->
+                <div id="mobile-sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-30 hidden md:hidden"></div>
+                
+                <!-- Mobile Sidebar -->
+                <aside id="mobile-sidebar" class="fixed top-0 left-0 h-full w-64 bg-slate-900 shadow-xl p-6 flex flex-col justify-between z-40 -translate-x-full md:hidden">
+                     <div>
+                        <div class="flex items-center justify-between mb-10">
+                            <div class="flex items-center space-x-3">
+                                <div class="p-2 bg-indigo-600 rounded-lg">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
+                                </div>
+                                <h1 class="text-xl font-bold">GMAO Pro</h1>
+                            </div>
+                            <button id="close-mobile-sidebar-btn" class="p-1">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+                            </button>
+                        </div>
+                        <nav class="flex flex-col space-y-2">${getNavLinks()}</nav>
+                    </div>
+                    <div>
+                        <div class="text-xs text-slate-400 mb-2 truncate">${currentUser.email}</div>
+                        <button id="mobile-logout-btn" class="w-full text-white bg-slate-600 hover:bg-red-600 font-semibold py-2 px-4 rounded-lg transition-colors flex items-center justify-center space-x-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clip-rule="evenodd" /></svg>
+                            <span>Déconnexion</span>
+                        </button>
+                    </div>
+                </aside>
+            `;
+        }
+
+        function openMobileSidebar() {
+            const sidebar = document.getElementById('mobile-sidebar');
+            const overlay = document.getElementById('mobile-sidebar-overlay');
+            if(sidebar && overlay) {
+                overlay.classList.remove('hidden');
+                sidebar.classList.remove('-translate-x-full');
+            }
+        }
+
+        function closeMobileSidebar() {
+            const sidebar = document.getElementById('mobile-sidebar');
+            const overlay = document.getElementById('mobile-sidebar-overlay');
+            if(sidebar && overlay) {
+                overlay.classList.add('hidden');
+                sidebar.classList.add('-translate-x-full');
+            }
         }
         
         function renderPage(title, content) {
@@ -534,28 +597,46 @@
                 </div>` : '';
 
             appContainer.innerHTML = `
-                <div class="flex h-screen">
+                <div class="flex h-screen bg-slate-900">
                     ${renderSidebar()}
-                    <main class="flex-1 p-4 md:p-8 overflow-y-auto">
-                        <header class="flex justify-between items-center mb-8">
-                            <div>
-                                <h2 class="text-3xl font-bold text-white">${title}</h2>
-                                <p class="text-slate-400">GMAO-IPM / ${userRole}</p>
-                            </div>
-                            <div class="flex items-center space-x-4">
-                                ${notificationArea}
-                                <img src="https://placehold.co/40x40/7e22ce/ffffff?text=${currentUser.email.charAt(0).toUpperCase()}" alt="User" class="w-10 h-10 rounded-full border-2 border-indigo-500">
+                    ${renderMobileSidebar()}
+                    <div class="flex-1 flex flex-col overflow-hidden">
+                        <header class="flex-shrink-0 bg-slate-900/70 backdrop-blur-sm border-b border-slate-800">
+                            <div class="flex justify-between items-center p-4">
+                                <div class="flex items-center">
+                                    <button id="mobile-menu-btn" class="p-2 rounded-md hover:bg-slate-700 md:hidden mr-3">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+                                    </button>
+                                    <div>
+                                        <h2 class="text-xl sm:text-2xl font-bold text-white">${title}</h2>
+                                        <p class="text-xs sm:text-sm text-slate-400">GMAO-IPM / ${userRole}</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-2 sm:space-x-4">
+                                    ${notificationArea}
+                                    <img src="https://placehold.co/40x40/7e22ce/ffffff?text=${currentUser.email.charAt(0).toUpperCase()}" alt="User" class="w-8 h-8 sm:w-10 sm:h-10 rounded-full border-2 border-indigo-500">
+                                </div>
                             </div>
                         </header>
-                        ${content}
-                    </main>
+                        <main class="flex-1 p-4 md:p-8 overflow-y-auto">
+                            ${content}
+                        </main>
+                    </div>
                 </div>`;
             
-            document.getElementById('logout-btn').addEventListener('click', async () => {
+            const logoutAction = async () => {
                 await signOut(auth);
                 window.location.hash = '';
                 window.location.reload();
-            });
+            };
+
+            document.getElementById('logout-btn').addEventListener('click', logoutAction);
+            document.getElementById('mobile-logout-btn').addEventListener('click', logoutAction);
+
+            // Mobile sidebar listeners
+            document.getElementById('mobile-menu-btn').addEventListener('click', openMobileSidebar);
+            document.getElementById('close-mobile-sidebar-btn').addEventListener('click', closeMobileSidebar);
+            document.getElementById('mobile-sidebar-overlay').addEventListener('click', closeMobileSidebar);
 
             const notificationBtn = document.getElementById('notification-btn');
             if (notificationBtn) {
@@ -584,10 +665,10 @@
         
         function renderDashboard() {
             const content = `
-                <div id="charts-dashboard" class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-8"></div>
+                <div id="charts-dashboard" class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4 md:gap-8"></div>
                 <div class="mt-10 bg-slate-800/70 backdrop-blur-sm rounded-xl border border-slate-700">
-                    <h3 class="text-xl font-bold p-6">Vos Demandes d'Intervention Récentes</h3>
-                    <div id="recent-di-list" class="space-y-2 p-6 pt-0">
+                    <h3 class="text-xl font-bold p-4 md:p-6">Vos Demandes d'Intervention Récentes</h3>
+                    <div id="recent-di-list" class="space-y-2 p-4 md:p-6 pt-0">
                         <p class="text-slate-400">Chargement des demandes...</p>
                     </div>
                 </div>`;
@@ -601,9 +682,9 @@
             if(!chartContainer) return;
 
             chartContainer.innerHTML = `
-                <div class="bg-slate-800/70 backdrop-blur-sm p-6 rounded-xl border border-slate-700 col-span-1 lg:col-span-2 xl:col-span-1"><canvas id="interventionTypeChart"></canvas></div>
-                <div class="bg-slate-800/70 backdrop-blur-sm p-6 rounded-xl border border-slate-700"><canvas id="interventionStatusChart"></canvas></div>
-                <div class="bg-slate-800/70 backdrop-blur-sm p-6 rounded-xl border border-slate-700"><canvas id="stockStatusChart"></canvas></div>
+                <div class="bg-slate-800/70 backdrop-blur-sm p-4 md:p-6 rounded-xl border border-slate-700 col-span-1 lg:col-span-2 xl:col-span-1"><canvas id="interventionTypeChart"></canvas></div>
+                <div class="bg-slate-800/70 backdrop-blur-sm p-4 md:p-6 rounded-xl border border-slate-700"><canvas id="interventionStatusChart"></canvas></div>
+                <div class="bg-slate-800/70 backdrop-blur-sm p-4 md:p-6 rounded-xl border border-slate-700"><canvas id="stockStatusChart"></canvas></div>
                 <div id="total-equipments-kpi-container" class="perspective-container"></div>
             `;
             
@@ -693,7 +774,7 @@
                     responsive: true,
                     plugins: {
                         legend: { position: 'top', labels: { color: '#cbd5e1' } },
-                        title: { display: true, text: 'Répartition des Interventions par Type', color: '#cbd5e1', font: { size: 16 } }
+                        title: { display: true, text: 'Répartition des Interventions', color: '#cbd5e1', font: { size: 16 } }
                     }
                 }
             });
@@ -759,7 +840,7 @@
                     responsive: true,
                     plugins: {
                         legend: { display: false },
-                        title: { display: true, text: 'État des Stocks de Pièces', color: '#cbd5e1', font: { size: 16 } }
+                        title: { display: true, text: 'État des Stocks', color: '#cbd5e1', font: { size: 16 } }
                     },
                     scales: {
                         y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
@@ -772,7 +853,7 @@
         }
 
         function renderDIForm() {
-            const content = `<div class="max-w-3xl mx-auto"><form id="di-form" class="bg-slate-800/70 border border-slate-700 p-8 space-y-6 rounded-xl">
+            const content = `<div class="max-w-3xl mx-auto"><form id="di-form" class="bg-slate-800/70 border border-slate-700 p-6 md:p-8 space-y-6 rounded-xl">
                 <div>
                     <label for="di-type" class="text-sm font-medium text-slate-300">Type de problème</label>
                     <select id="di-type" required class="form-input mt-1">
@@ -819,8 +900,8 @@
             let allDIsForExport = []; // To hold the current list of DIs
 
             const content = `
-                <div class="bg-slate-800/70 border border-slate-700 rounded-xl p-6">
-                    <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
+                <div class="bg-slate-800/70 border border-slate-700 rounded-xl p-4 md:p-6">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 flex-wrap gap-4">
                         <h3 class="text-xl font-semibold text-white">Suivi des Demandes et OT</h3>
                         <button id="export-interventions-btn" class="btn btn-success hidden">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
@@ -868,7 +949,7 @@
                         hasCloturee = true;
                     }
                     
-                    const adminDeleteButton = (userRole === 'admin') ? `<button data-di-id="${diId}" class="delete-di-btn text-white bg-red-800 hover:bg-red-900 font-semibold py-1 px-3 text-sm rounded-md transition-colors mt-2">Supprimer</button>` : '';
+                    const adminDeleteButton = (userRole === 'admin') ? `<button data-di-id="${diId}" class="delete-di-btn text-white bg-red-800 hover:bg-red-900 font-semibold py-1 px-3 text-sm rounded-md transition-colors w-full sm:w-auto">Supprimer</button>` : '';
 
                     let usedPartsHtml = '';
                     if (di.usedParts && di.usedParts.length > 0) {
@@ -895,17 +976,17 @@
                     card.className = 'bg-slate-900/50 p-4 rounded-lg border border-slate-700 relative';
                     card.innerHTML = `
                         ${exportCheckbox}
-                        <div class="flex justify-between items-start flex-wrap gap-4">
-                            <div>
+                        <div class="flex flex-col sm:flex-row justify-between items-start gap-4">
+                            <div class="flex-grow">
                                 <p class="font-bold text-lg text-white">${di.isOT ? 'OT' : 'DI'}: ${di.type} - ${di.location}</p>
                                 <p class="text-slate-300 mt-1">${di.description}</p>
                                 <p class="text-sm text-slate-500 mt-2">Demandé le: ${date} par ${di.demandeurEmail}</p>
                                 ${di.closedAt ? `<p class="text-sm text-slate-500">Clôturé le: ${di.closedAt.toDate().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })}</p>` : ''}
                             </div>
-                            <div class="flex flex-col items-end space-y-2 flex-shrink-0">
-                               <span class="text-sm font-semibold px-3 py-1 rounded-full ${statusColor}">${di.status}</span>
+                            <div class="flex flex-col items-stretch sm:items-end space-y-2 flex-shrink-0 w-full sm:w-auto">
+                               <span class="text-sm font-semibold px-3 py-1 rounded-full ${statusColor} text-center">${di.status}</span>
                                ${(userRole === 'manager' || userRole === 'admin') && !di.isOT ? `<button data-di-id="${diId}" class="create-ot-btn text-white bg-green-600 hover:bg-green-700 font-semibold py-1 px-3 text-sm rounded-md transition-colors">Créer OT</button>` : ''}
-                               ${(userRole === 'manager' || userRole === 'admin' || userRole === 'technicien') && di.isOT && di.status !== 'clôturée' ? `<button data-di-id="${diId}" class="close-ot-btn text-white bg-red-600 hover:bg-red-700 font-semibold py-1 px-3 text-sm rounded-md transition-colors mt-2">Clôturer</button>` : ''}
+                               ${(userRole === 'manager' || userRole === 'admin' || userRole === 'technicien') && di.isOT && di.status !== 'clôturée' ? `<button data-di-id="${diId}" class="close-ot-btn text-white bg-red-600 hover:bg-red-700 font-semibold py-1 px-3 text-sm rounded-md transition-colors">Clôturer</button>` : ''}
                                ${adminDeleteButton}
                             </div>
                         </div>
@@ -1127,10 +1208,10 @@
                 return;
             }
             const content = `
-                <div class="bg-slate-800/70 border border-slate-700 rounded-xl p-4"><div id='calendar'></div></div>
+                <div class="bg-slate-800/70 border border-slate-700 rounded-xl p-2 md:p-4"><div id='calendar'></div></div>
                 
                 <!-- Modal for ADDING event -->
-                <div id="event-modal" class="fixed inset-0 bg-black bg-opacity-70 overflow-y-auto h-full w-full hidden z-50 flex items-center justify-center">
+                <div id="event-modal" class="fixed inset-0 bg-black bg-opacity-70 overflow-y-auto h-full w-full hidden z-50 flex items-center justify-center p-4">
                   <div class="relative p-5 border w-full max-w-md shadow-lg rounded-xl bg-slate-800 border-slate-700">
                     <div class="mt-3 text-center">
                       <h3 class="text-lg leading-6 font-medium text-white">Ajouter un événement au planning</h3>
@@ -1150,7 +1231,7 @@
                 </div>
 
                 <!-- Modal for EDITING event -->
-                <div id="edit-event-modal" class="fixed inset-0 bg-black bg-opacity-70 overflow-y-auto h-full w-full hidden z-50 flex items-center justify-center">
+                <div id="edit-event-modal" class="fixed inset-0 bg-black bg-opacity-70 overflow-y-auto h-full w-full hidden z-50 flex items-center justify-center p-4">
                   <div class="relative p-5 border w-full max-w-md shadow-lg rounded-xl bg-slate-800 border-slate-700">
                     <div class="mt-3">
                       <h3 class="text-lg leading-6 font-medium text-white text-center">Modifier l'événement</h3>
@@ -1387,7 +1468,7 @@
                 renderPage('Accès non autorisé', '<p class="text-red-400">Vous n\'avez pas les droits pour accéder à cette page.</p>');
                 return;
             }
-            const content = `<div class="bg-slate-800/70 border border-slate-700 rounded-xl p-6"><div id="users-list-container" class="space-y-4"></div></div>`;
+            const content = `<div class="bg-slate-800/70 border border-slate-700 rounded-xl p-4 md:p-6"><div id="users-list-container" class="space-y-4"></div></div>`;
             renderPage('Gestion des Utilisateurs', content);
 
             const usersCollectionRef = collection(db, `artifacts/${appId}/users`);
@@ -1398,13 +1479,13 @@
                 snapshot.forEach(userDoc => {
                     const userData = userDoc.data();
                     const userCard = document.createElement('div');
-                    userCard.className = 'bg-slate-900/50 p-4 rounded-lg border border-slate-700 flex justify-between items-center';
+                    userCard.className = 'bg-slate-900/50 p-4 rounded-lg border border-slate-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4';
                     userCard.innerHTML = `
                         <div>
-                            <p class="font-semibold text-white">${userData.email}</p>
+                            <p class="font-semibold text-white break-all">${userData.email}</p>
                             <p class="text-sm text-slate-400">Rôle actuel : ${userData.role}</p>
                         </div>
-                        <select data-uid="${userDoc.id}" class="form-input w-48 change-role-select">
+                        <select data-uid="${userDoc.id}" class="form-input w-full sm:w-48 change-role-select">
                             <option value="demandeur" ${userData.role === 'demandeur' ? 'selected' : ''}>Demandeur</option>
                             <option value="technicien" ${userData.role === 'technicien' ? 'selected' : ''}>Technicien</option>
                             <option value="manager" ${userData.role === 'manager' ? 'selected' : ''}>Manager</option>
@@ -1437,10 +1518,10 @@
                 return;
             }
             const content = `
-                <div class="bg-slate-800/70 border border-slate-700 rounded-xl p-6">
-                    <div class="flex justify-between items-center mb-4 flex-wrap gap-4">
+                <div class="bg-slate-800/70 border border-slate-700 rounded-xl p-4 md:p-6">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 flex-wrap gap-4">
                         <h3 class="text-xl font-semibold text-white">Liste des équipements</h3>
-                        <div class="flex space-x-2">
+                        <div class="flex space-x-2 flex-wrap gap-2">
                             <button id="add-equipment-btn" class="btn btn-primary">Ajouter</button>
                             <button id="filter-equipment-btn" class="btn btn-secondary">Filtrer</button>
                             <button id="import-csv-btn" class="btn btn-secondary">Importer CSV</button>
@@ -1849,12 +1930,12 @@
                 return;
             }
             const content = `
-                <div class="bg-slate-800/70 border border-slate-700 rounded-xl p-6">
-                    <div class="flex justify-between items-center mb-4 flex-wrap gap-4">
+                <div class="bg-slate-800/70 border border-slate-700 rounded-xl p-4 md:p-6">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 flex-wrap gap-4">
                         <h3 class="text-xl font-semibold text-white">Gestion des Pièces et Stocks</h3>
-                        <div class="flex space-x-2">
+                        <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
+                            <input type="text" id="parts-filter-input" class="form-input w-full sm:w-64" placeholder="Filtrer les pièces...">
                             <button id="add-part-btn" class="btn btn-primary">Ajouter une Pièce</button>
-                            <input type="text" id="parts-filter-input" class="form-input w-64" placeholder="Filtrer les pièces...">
                         </div>
                     </div>
                     <div class="overflow-x-auto">
@@ -1884,7 +1965,7 @@
                             <div><label for="part-designation" class="text-sm font-medium text-slate-300">Désignation</label><input id="part-designation" type="text" required class="form-input mt-1"></div>
                             <div><label for="part-reference" class="text-sm font-medium text-slate-300">Référence / N° de série</label><input id="part-reference" type="text" class="form-input mt-1"></div>
                             <div><label for="part-location" class="text-sm font-medium text-slate-300">Localisation</label><input id="part-location" type="text" class="form-input mt-1"></div>
-                            <div class="grid grid-cols-2 gap-4">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div><label for="part-stock" class="text-sm font-medium text-slate-300">Stock Actuel</label><input id="part-stock" type="number" min="0" required class="form-input mt-1"></div>
                                 <div><label for="part-stock-min" class="text-sm font-medium text-slate-300">Stock Minimum</label><input id="part-stock-min" type="number" min="0" required class="form-input mt-1"></div>
                             </div>
@@ -2042,8 +2123,8 @@
                 return;
             }
             const content = `
-                <div class="bg-slate-800/70 border border-slate-700 rounded-xl p-6">
-                    <div class="flex justify-between items-center mb-4 flex-wrap gap-4">
+                <div class="bg-slate-800/70 border border-slate-700 rounded-xl p-4 md:p-6">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 flex-wrap gap-4">
                         <h3 class="text-xl font-semibold text-white">Tâches de Maintenance Préventive</h3>
                         <button id="add-preventive-task-btn" class="btn btn-primary">Ajouter une Tâche</button>
                     </div>
@@ -2075,7 +2156,7 @@
                                 <label for="preventive-task-description" class="text-sm font-medium text-slate-300">Tâche / Description</label>
                                 <textarea id="preventive-task-description" rows="3" required class="form-input mt-1"></textarea>
                             </div>
-                            <div class="grid grid-cols-2 gap-4">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
                                     <label for="preventive-task-frequency" class="text-sm font-medium text-slate-300">Fréquence</label>
                                     <select id="preventive-task-frequency" required class="form-input mt-1">
@@ -2283,9 +2364,9 @@
                 return;
             }
             const content = `
-                <div class="bg-slate-800/70 border border-slate-700 rounded-xl p-6">
-                    <div class="flex justify-between items-center mb-4 flex-wrap gap-4">
-                        <h3 class="text-xl font-semibold text-white">Gestion des Contrats et de la Sous-Traitance</h3>
+                <div class="bg-slate-800/70 border border-slate-700 rounded-xl p-4 md:p-6">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 flex-wrap gap-4">
+                        <h3 class="text-xl font-semibold text-white">Gestion des Contrats</h3>
                         <button id="add-contract-btn" class="btn btn-primary">Ajouter un Contrat</button>
                     </div>
                     <div class="overflow-x-auto">
@@ -2312,10 +2393,10 @@
                         <h3 id="contract-modal-title" class="text-lg font-medium mb-4 text-white">Ajouter un contrat</h3>
                         
                         <div class="border-b border-slate-600 mb-4">
-                            <nav class="flex space-x-4" aria-label="Tabs">
-                                <button data-tab="general" class="contract-tab-btn text-indigo-400 border-b-2 border-indigo-400 px-3 py-2 text-sm font-medium">Infos Générales</button>
-                                <button data-tab="periods" class="contract-tab-btn text-slate-400 hover:text-white px-3 py-2 text-sm font-medium">Périodes</button>
-                                <button data-tab="equipment" class="contract-tab-btn text-slate-400 hover:text-white px-3 py-2 text-sm font-medium">Équipements</button>
+                            <nav class="flex space-x-1 sm:space-x-4" aria-label="Tabs">
+                                <button data-tab="general" class="contract-tab-btn text-indigo-400 border-b-2 border-indigo-400 px-2 sm:px-3 py-2 text-sm font-medium">Général</button>
+                                <button data-tab="periods" class="contract-tab-btn text-slate-400 hover:text-white px-2 sm:px-3 py-2 text-sm font-medium">Périodes</button>
+                                <button data-tab="equipment" class="contract-tab-btn text-slate-400 hover:text-white px-2 sm:px-3 py-2 text-sm font-medium">Équipements</button>
                             </nav>
                         </div>
 
@@ -2329,14 +2410,14 @@
                                     <div><label for="contract-responsable" class="text-sm font-medium text-slate-300">Responsable</label><input id="contract-responsable" type="text" class="form-input mt-1"></div>
                                     <div><label for="contract-reference" class="text-sm font-medium text-slate-300">Référence</label><input id="contract-reference" type="text" class="form-input mt-1"></div>
                                 </div>
-                                <div><label for="contract-description" class="text-sm font-medium text-slate-300">Description / Conditions spéciales</label><textarea id="contract-description" rows="3" class="form-input mt-1"></textarea></div>
+                                <div><label for="contract-description" class="text-sm font-medium text-slate-300">Description / Conditions</label><textarea id="contract-description" rows="3" class="form-input mt-1"></textarea></div>
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div>
                                         <label for="contract-type" class="text-sm font-medium text-slate-300">Type de contrat</label>
                                         <select id="contract-type" class="form-input mt-1"><option>Sous-traitance</option><option>Fourniture</option><option>Service</option></select>
                                     </div>
                                     <div>
-                                        <label for="contract-renewal" class="text-sm font-medium text-slate-300">Mode de renouvellement</label>
+                                        <label for="contract-renewal" class="text-sm font-medium text-slate-300">Renouvellement</label>
                                         <select id="contract-renewal" class="form-input mt-1"><option>Manuel</option><option>Tacite reconduction</option></select>
                                     </div>
                                     <div><label for="contract-duration" class="text-sm font-medium text-slate-300">Durée</label><input id="contract-duration" type="text" placeholder="Ex: 1 an" class="form-input mt-1"></div>
@@ -2347,10 +2428,10 @@
                             <div id="contract-tab-periods" class="contract-tab-content space-y-4 hidden">
                                 <div class="bg-slate-900/50 p-4 rounded-lg">
                                     <h4 class="font-semibold mb-2">Ajouter une période</h4>
-                                    <div class="flex items-end space-x-2">
+                                    <div class="flex flex-col sm:flex-row items-stretch sm:items-end space-y-2 sm:space-y-0 sm:space-x-2">
                                         <div class="flex-1"><label for="period-start-date" class="text-xs font-medium text-slate-300">Date de début</label><input id="period-start-date" type="date" class="form-input mt-1"></div>
                                         <div class="flex-1"><label for="period-end-date" class="text-xs font-medium text-slate-300">Date de fin</label><input id="period-end-date" type="date" class="form-input mt-1"></div>
-                                        <button type="button" id="add-period-btn" class="btn btn-secondary h-10">Ajouter</button>
+                                        <button type="button" id="add-period-btn" class="btn btn-secondary h-10 w-full sm:w-auto">Ajouter</button>
                                     </div>
                                 </div>
                                 <div>
@@ -2434,7 +2515,7 @@
             });
         }
 
-        function openContractModal(id = null) {
+        async function openContractModal(id = null) {
             const modal = document.getElementById('contract-modal');
             const form = document.getElementById('contract-form');
             const title = document.getElementById('contract-modal-title');
@@ -2458,11 +2539,11 @@
                     document.getElementById('contract-duration').value = contract.duree || '';
                     document.getElementById('contract-notice').value = contract.preavis || '';
                     tempPeriods = contract.periods ? [...contract.periods] : [];
-                    populateEquipmentList(contract.linkedEquipmentIds || []);
+                    await populateEquipmentList(contract.linkedEquipmentIds || []);
                 }
             } else {
                 title.textContent = "Ajouter un contrat";
-                populateEquipmentList([]);
+                await populateEquipmentList([]);
             }
             renderPeriodsList();
             modal.classList.remove('hidden');
@@ -2571,13 +2652,26 @@
             });
         }
 
-        function populateEquipmentList(selectedIds = []) {
+        async function populateEquipmentList(selectedIds = []) {
             const container = document.getElementById('contract-equipment-list');
+            if (!container) return;
             container.innerHTML = '';
+            
+            if (allEquipments.length === 0) {
+                 try {
+                    const partsCollectionRef = collection(db, `artifacts/${appId}/public/data/equipements`);
+                    const snapshot = await getDocs(partsCollectionRef);
+                    allEquipments = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
+                } catch (error) {
+                    console.error("Failed to fetch equipments:", error);
+                }
+            }
+
             if (allEquipments.length === 0) {
                 container.innerHTML = '<p class="text-slate-500 text-sm text-center p-2">Aucun équipement disponible.</p>';
                 return;
             }
+
             allEquipments.forEach(equip => {
                 const isChecked = selectedIds.includes(equip.id);
                 const label = document.createElement('label');
@@ -2597,7 +2691,7 @@
                 return;
             }
             const content = `
-                <div class="bg-slate-800/70 border border-slate-700 rounded-xl p-6">
+                <div class="bg-slate-800/70 border border-slate-700 rounded-xl p-4 md:p-6">
                     <h3 class="text-xl font-semibold text-white mb-4">Journal d'Activité</h3>
                     <div class="overflow-x-auto">
                         <table class="w-full text-sm text-left text-slate-400">
@@ -2637,10 +2731,10 @@
 
                     row.innerHTML = `
                         <td class="px-6 py-4 whitespace-nowrap">${date}</td>
-                        <td class="px-6 py-4 font-medium text-white">${log.userEmail}</td>
+                        <td class="px-6 py-4 font-medium text-white break-all">${log.userEmail}</td>
                         <td class="px-6 py-4">${log.userRole}</td>
                         <td class="px-6 py-4">${log.action}</td>
-                        <td class="px-6 py-4"><pre class="text-xs whitespace-pre-wrap">${details}</pre></td>
+                        <td class="px-6 py-4"><pre class="text-xs whitespace-pre-wrap break-all">${details}</pre></td>
                     `;
                     container.appendChild(row);
                 });
