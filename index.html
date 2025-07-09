@@ -4,7 +4,7 @@
     <link rel="manifest" href="manifest.json">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GMAO IPM Web App</title>
+    <title>GMAO Web IPM App</title>
 
     <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -145,6 +145,65 @@
         #mobile-sidebar {
             transition: transform 0.3s ease-in-out;
         }
+
+        /* START: Notification Pop-up Styles */
+        #notification-popup-container {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            width: 90%;
+            max-width: 350px;
+        }
+
+        .notification-popup {
+            background-color: #1e293b; /* slate-800 */
+            color: #f1f5f9; /* slate-100 */
+            padding: 1rem;
+            border-radius: 0.75rem;
+            border: 1px solid #334155; /* slate-700 */
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            opacity: 0;
+            transform: translateX(100%);
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+
+        .notification-popup.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+        
+        .notification-popup.success { border-left: 4px solid #22c55e; } /* green-500 */
+        .notification-popup.error { border-left: 4px solid #ef4444; } /* red-500 */
+        .notification-popup.info { border-left: 4px solid #3b82f6; } /* blue-500 */
+
+
+        .notification-icon {
+            flex-shrink: 0;
+            width: 1.5rem;
+            height: 1.5rem;
+        }
+
+        .notification-content {
+            flex-grow: 1;
+        }
+
+        .notification-title {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .notification-message {
+            font-size: 0.875rem;
+            color: #cbd5e1; /* slate-300 */
+        }
+        /* END: Notification Pop-up Styles */
     </style>
 </head>
 <body class="text-slate-200 bg-pattern">
@@ -153,6 +212,11 @@
     <div id="app-container" class="w-full min-h-screen">
         <!-- App content is injected here by JavaScript -->
     </div>
+    
+    <!-- START: Notification Pop-up Container -->
+    <div id="notification-popup-container"></div>
+    <!-- END: Notification Pop-up Container -->
+
 
     <!-- Global Modals -->
     <div id="delete-confirm-modal" class="fixed inset-0 bg-black bg-opacity-70 hidden z-50 flex items-center justify-center p-4">
@@ -228,6 +292,7 @@
         let allContracts = [];
         
         let notificationListenerUnsubscribe = null; // To prevent multiple listeners
+        let knownNotificationIds = new Set(); // To track shown notifications
 
         // --- INITIALIZATION ---
         function initApp() {
@@ -349,6 +414,47 @@
         }
 
         // --- NOTIFICATIONS ---
+        
+        /**
+         * Shows a notification pop-up on the screen.
+         * @param {string} title - The title of the notification.
+         * @param {string} message - The main message content.
+         * @param {string} type - The type of notification ('info', 'success', 'error').
+         */
+        function showNotification(title, message, type = 'info') {
+            const container = document.getElementById('notification-popup-container');
+            if (!container) return;
+
+            const icons = {
+                info: `<svg class="notification-icon text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`,
+                success: `<svg class="notification-icon text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`,
+                error: `<svg class="notification-icon text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`,
+            };
+
+            const popup = document.createElement('div');
+            popup.className = `notification-popup ${type}`;
+            popup.innerHTML = `
+                ${icons[type] || icons['info']}
+                <div class="notification-content">
+                    <h4 class="notification-title">${title}</h4>
+                    <p class="notification-message">${message}</p>
+                </div>
+            `;
+
+            container.appendChild(popup);
+
+            // Trigger the animation
+            setTimeout(() => {
+                popup.classList.add('show');
+            }, 10);
+
+            // Automatically remove the notification after 5 seconds
+            setTimeout(() => {
+                popup.classList.remove('show');
+                popup.addEventListener('transitionend', () => popup.remove());
+            }, 5000);
+        }
+        
         function setupNotificationListener() {
             if (notificationListenerUnsubscribe) {
                 notificationListenerUnsubscribe();
@@ -364,10 +470,29 @@
             const q = query(collection(db, `artifacts/${appId}/public/data/DI`), where("status", "==", "nouvelle"));
             
             notificationListenerUnsubscribe = onSnapshot(q, (snapshot) => {
-                const newDIs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                updateNotificationUI(newDIs);
+                const newDIs = [];
+                snapshot.docChanges().forEach((change) => {
+                    if (change.type === "added") {
+                        const diData = { id: change.doc.id, ...change.doc.data() };
+                        newDIs.push(diData);
+                        // Show a pop-up for each new DI
+                        if (!knownNotificationIds.has(diData.id)) {
+                            showNotification(
+                                'Nouvelle Demande', 
+                                `DI pour: ${diData.type} - ${diData.location}`, 
+                                'info'
+                            );
+                            knownNotificationIds.add(diData.id);
+                        }
+                    }
+                });
+
+                // Update the bell icon UI as before
+                updateNotificationUI(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+
             }, (error) => {
                 console.error("Error fetching notifications: ", error);
+                showNotification('Erreur', 'Impossible de charger les notifications.', 'error');
             });
         }
 
@@ -516,7 +641,7 @@
                             <div class="p-2 bg-indigo-600 rounded-lg">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
                             </div>
-                            <h1 class="text-xl font-bold">GMAO Pro</h1>
+                            <h1 class="text-xl font-bold">GMAO IPM</h1>
                         </div>
                         <nav class="flex flex-col space-y-2">${getNavLinks()}</nav>
                     </div>
@@ -664,15 +789,20 @@
         }
         
         function renderDashboard() {
+            // MODIFIED: Conditional content based on role
+            const isDemandeur = userRole === 'demandeur';
+            const dashboardTitle = isDemandeur ? "Vos Demandes" : "Tableau de Bord";
+            const chartsGridClass = isDemandeur ? "grid-cols-1 lg:grid-cols-2 gap-4 md:gap-8" : "grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4 md:gap-8";
+
             const content = `
-                <div id="charts-dashboard" class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4 md:gap-8"></div>
+                <div id="charts-dashboard" class="grid ${chartsGridClass}"></div>
                 <div class="mt-10 bg-slate-800/70 backdrop-blur-sm rounded-xl border border-slate-700">
                     <h3 class="text-xl font-bold p-4 md:p-6">Vos Demandes d'Intervention Récentes</h3>
                     <div id="recent-di-list" class="space-y-2 p-4 md:p-6 pt-0">
                         <p class="text-slate-400">Chargement des demandes...</p>
                     </div>
                 </div>`;
-            renderPage('Tableau de Bord', content);
+            renderPage(dashboardTitle, content);
             setupDashboardCharts();
             loadRecentDIs();
         }
@@ -681,173 +811,198 @@
             const chartContainer = document.getElementById('charts-dashboard');
             if(!chartContainer) return;
 
-            chartContainer.innerHTML = `
-                <div class="bg-slate-800/70 backdrop-blur-sm p-4 md:p-6 rounded-xl border border-slate-700 col-span-1 lg:col-span-2 xl:col-span-1"><canvas id="interventionTypeChart"></canvas></div>
-                <div class="bg-slate-800/70 backdrop-blur-sm p-4 md:p-6 rounded-xl border border-slate-700"><canvas id="interventionStatusChart"></canvas></div>
-                <div class="bg-slate-800/70 backdrop-blur-sm p-4 md:p-6 rounded-xl border border-slate-700"><canvas id="stockStatusChart"></canvas></div>
-                <div id="total-equipments-kpi-container" class="perspective-container"></div>
-            `;
+            // MODIFIED: Check role to determine which charts and data to load
+            const isDemandeur = userRole === 'demandeur';
+
+            // --- Step 1: Fetch Data ---
+            // DIs are fetched based on role
+            const diQuery = isDemandeur
+                ? query(collection(db, `artifacts/${appId}/public/data/DI`), where("demandeurId", "==", userId))
+                : collection(db, `artifacts/${appId}/public/data/DI`);
+
+            // Other data is only fetched for non-demandeurs
+            const dataPromises = [getDocs(diQuery)];
+            if (!isDemandeur) {
+                dataPromises.push(getDocs(collection(db, `artifacts/${appId}/public/data/spareParts`)));
+                dataPromises.push(getDocs(collection(db, `artifacts/${appId}/public/data/equipements`)));
+            }
             
-            const diQuery = collection(db, `artifacts/${appId}/public/data/DI`);
-            const partsQuery = collection(db, `artifacts/${appId}/public/data/spareParts`);
-            const equipQuery = collection(db, `artifacts/${appId}/public/data/equipements`);
+            const snapshots = await Promise.all(dataPromises);
 
-            const [diSnapshot, partsSnapshot, equipSnapshot] = await Promise.all([
-                getDocs(diQuery), 
-                getDocs(partsQuery),
-                getDocs(equipQuery)
-            ]);
-            
-            const interventions = diSnapshot.docs.map(doc => doc.data());
-            const parts = partsSnapshot.docs.map(doc => doc.data());
-            const equipments = equipSnapshot.docs.map(doc => doc.data());
-            
-            // --- KPI Card: Total Equipment ---
-            const equipKpiContainer = document.getElementById('total-equipments-kpi-container');
-            if (equipKpiContainer) {
-                equipKpiContainer.innerHTML = `
-                    <div class="card-3d bg-slate-800/70 backdrop-blur-sm p-6 rounded-xl shadow-2xl border border-slate-700 hover:shadow-teal-500/50 h-full flex flex-col justify-between">
-                        <div>
-                            <div class="flex justify-between items-start">
-                                <div style="transform: translateZ(20px);">
-                                    <h3 class="text-slate-400 font-medium">Équipements</h3>
-                                    <p id="total-equipments-kpi" class="text-4xl font-bold text-white">${equipments.length}</p>
-                                </div>
-                                <div class="p-3 bg-teal-500 rounded-lg" style="transform: translateZ(30px);">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="space-y-2 mt-4" style="transform: translateZ(10px);">
-                           <select id="equip-filter-loc" class="form-input text-sm py-1"><option value="all">Toutes localisations</option></select>
-                           <select id="equip-filter-des" class="form-input text-sm py-1"><option value="all">Toutes désignations</option></select>
-                        </div>
-                    </div>
-                `;
-                
-                const locFilter = document.getElementById('equip-filter-loc');
-                const desFilter = document.getElementById('equip-filter-des');
-                const totalEquipmentsElement = document.getElementById('total-equipments-kpi');
-
-                const uniqueLocalisations = [...new Set(equipments.map(e => e.localisation?.trim()).filter(Boolean))];
-                const uniqueDesignations = [...new Set(equipments.map(e => e.designation?.trim()).filter(Boolean))];
-
-                uniqueLocalisations.forEach(loc => locFilter.innerHTML += `<option value="${loc}">${loc}</option>`);
-                uniqueDesignations.forEach(des => desFilter.innerHTML += `<option value="${des}">${des}</option>`);
-
-                const updateEquipmentsKpi = () => {
-                    const selectedLoc = locFilter.value;
-                    const selectedDes = desFilter.value;
-
-                    const filtered = equipments.filter(e => {
-                        const locMatch = selectedLoc === 'all' || e.localisation?.trim() === selectedLoc;
-                        const desMatch = selectedDes === 'all' || e.designation?.trim() === selectedDes;
-                        return locMatch && desMatch;
-                    });
-                    totalEquipmentsElement.textContent = filtered.length;
-                };
-
-                locFilter.addEventListener('change', updateEquipmentsKpi);
-                desFilter.addEventListener('change', updateEquipmentsKpi);
+            const interventions = snapshots[0].docs.map(doc => doc.data());
+            let parts = [];
+            let equipments = [];
+            if (!isDemandeur) {
+                parts = snapshots[1].docs.map(doc => doc.data());
+                equipments = snapshots[2].docs.map(doc => doc.data());
             }
 
-            // --- Chart 1: Intervention Types ---
+            // --- Step 2: Render Chart Containers ---
+            let chartsHTML = `
+                <div class="bg-slate-800/70 backdrop-blur-sm p-4 md:p-6 rounded-xl border border-slate-700 ${!isDemandeur ? 'col-span-1 lg:col-span-2 xl:col-span-1' : ''}"><canvas id="interventionTypeChart"></canvas></div>
+                <div class="bg-slate-800/70 backdrop-blur-sm p-4 md:p-6 rounded-xl border border-slate-700"><canvas id="interventionStatusChart"></canvas></div>
+            `;
+            if (!isDemandeur) {
+                chartsHTML += `
+                    <div class="bg-slate-800/70 backdrop-blur-sm p-4 md:p-6 rounded-xl border border-slate-700"><canvas id="stockStatusChart"></canvas></div>
+                    <div id="total-equipments-kpi-container" class="perspective-container"></div>
+                `;
+            }
+            chartContainer.innerHTML = chartsHTML;
+
+            // --- Step 3: Populate Charts ---
+            // Chart 1: Intervention Types (always rendered, but with filtered data for demandeur)
             const typeCounts = interventions.reduce((acc, di) => {
                 acc[di.type] = (acc[di.type] || 0) + 1;
                 return acc;
             }, {});
 
-            const typeCtx = document.getElementById('interventionTypeChart').getContext('2d');
-            new Chart(typeCtx, {
-                type: 'doughnut',
-                data: {
-                    labels: Object.keys(typeCounts),
-                    datasets: [{
-                        label: 'Interventions par Type',
-                        data: Object.values(typeCounts),
-                        backgroundColor: ['#6366f1', '#38bdf8', '#fbbf24', '#4ade80', '#a78bfa', '#f87171'],
-                        borderColor: '#0f172a',
-                        borderWidth: 4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        legend: { position: 'top', labels: { color: '#cbd5e1' } },
-                        title: { display: true, text: 'Répartition des Interventions', color: '#cbd5e1', font: { size: 16 } }
+            if (document.getElementById('interventionTypeChart')) {
+                new Chart(document.getElementById('interventionTypeChart').getContext('2d'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: Object.keys(typeCounts).length > 0 ? Object.keys(typeCounts) : ["Aucune Donnée"],
+                        datasets: [{
+                            label: 'Interventions par Type',
+                            data: Object.keys(typeCounts).length > 0 ? Object.values(typeCounts) : [1],
+                            backgroundColor: Object.keys(typeCounts).length > 0 ? ['#6366f1', '#38bdf8', '#fbbf24', '#4ade80', '#a78bfa', '#f87171'] : ['#334155'],
+                            borderColor: '#0f172a',
+                            borderWidth: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { position: 'top', labels: { color: '#cbd5e1' } },
+                            title: { display: true, text: 'Répartition de vos Interventions', color: '#cbd5e1', font: { size: 16 } }
+                        }
                     }
-                }
-            });
+                });
+            }
 
-            // --- Chart 2: Intervention Status ---
+            // Chart 2: Intervention Status (always rendered, but with filtered data for demandeur)
             const statusOrder = ['nouvelle', 'planifiée', 'en cours', 'clôturée'];
             const statusCounts = interventions.reduce((acc, di) => {
                 acc[di.status] = (acc[di.status] || 0) + 1;
                 return acc;
             }, {});
 
-            const statusCtx = document.getElementById('interventionStatusChart').getContext('2d');
-            new Chart(statusCtx, {
-                type: 'bar',
-                data: {
-                    labels: statusOrder,
-                    datasets: [{
-                        label: 'Nombre d\'Interventions',
-                        data: statusOrder.map(status => statusCounts[status] || 0),
-                        backgroundColor: ['#3b82f6', '#8b5cf6', '#f59e0b', '#22c55e'],
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        legend: { display: false },
-                        title: { display: true, text: 'Statut des Interventions', color: '#cbd5e1', font: { size: 16 } }
+            if (document.getElementById('interventionStatusChart')) {
+                 new Chart(document.getElementById('interventionStatusChart').getContext('2d'), {
+                    type: 'bar',
+                    data: {
+                        labels: statusOrder,
+                        datasets: [{
+                            label: 'Nombre d\'Interventions',
+                            data: statusOrder.map(status => statusCounts[status] || 0),
+                            backgroundColor: ['#3b82f6', '#8b5cf6', '#f59e0b', '#22c55e'],
+                        }]
                     },
-                    scales: {
-                        y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
-                        x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { display: false },
+                            title: { display: true, text: 'Statut de vos Interventions', color: '#cbd5e1', font: { size: 16 } }
+                        },
+                        scales: {
+                            y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
+                            x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }
+                        }
                     }
-                }
-            });
+                });
+            }
 
-            // --- Chart 3: Stock Status ---
-            const stockStatus = { ok: 0, low: 0, critical: 0 };
-            parts.forEach(part => {
-                const stock = parseInt(part.stock, 10);
-                const stockMin = parseInt(part.stockMin, 10);
-                if (stock === 0) {
-                    stockStatus.critical++;
-                } else if (stock < stockMin) {
-                    stockStatus.low++;
-                } else {
-                    stockStatus.ok++;
-                }
-            });
-
-            const stockCtx = document.getElementById('stockStatusChart').getContext('2d');
-            new Chart(stockCtx, {
-                type: 'bar',
-                data: {
-                    labels: ['OK', 'Faible', 'Critique'],
-                    datasets: [{
-                        label: 'État des Stocks',
-                        data: [stockStatus.ok, stockStatus.low, stockStatus.critical],
-                        backgroundColor: ['#22c55e', '#f59e0b', '#ef4444'],
-                    }]
-                },
-                options: {
-                    indexAxis: 'y',
-                    responsive: true,
-                    plugins: {
-                        legend: { display: false },
-                        title: { display: true, text: 'État des Stocks', color: '#cbd5e1', font: { size: 16 } }
-                    },
-                    scales: {
-                        y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
-                        x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }
+            // Charts 3 & 4 (only for manager/admin)
+            if (!isDemandeur) {
+                // Chart 3: Stock Status
+                const stockStatus = { ok: 0, low: 0, critical: 0 };
+                parts.forEach(part => {
+                    const stock = parseInt(part.stock, 10);
+                    const stockMin = parseInt(part.stockMin, 10);
+                    if (stock === 0) {
+                        stockStatus.critical++;
+                    } else if (stock < stockMin) {
+                        stockStatus.low++;
+                    } else {
+                        stockStatus.ok++;
                     }
+                });
+
+                if (document.getElementById('stockStatusChart')) {
+                    new Chart(document.getElementById('stockStatusChart').getContext('2d'), {
+                        type: 'bar',
+                        data: {
+                            labels: ['OK', 'Faible', 'Critique'],
+                            datasets: [{
+                                label: 'État des Stocks',
+                                data: [stockStatus.ok, stockStatus.low, stockStatus.critical],
+                                backgroundColor: ['#22c55e', '#f59e0b', '#ef4444'],
+                            }]
+                        },
+                        options: {
+                            indexAxis: 'y',
+                            responsive: true,
+                            plugins: {
+                                legend: { display: false },
+                                title: { display: true, text: 'État des Stocks', color: '#cbd5e1', font: { size: 16 } }
+                            },
+                            scales: {
+                                y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
+                                x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }
+                            }
+                        }
+                    });
                 }
-            });
+                
+                // KPI Card: Total Equipment
+                const equipKpiContainer = document.getElementById('total-equipments-kpi-container');
+                if (equipKpiContainer) {
+                    equipKpiContainer.innerHTML = `
+                        <div class="card-3d bg-slate-800/70 backdrop-blur-sm p-6 rounded-xl shadow-2xl border border-slate-700 hover:shadow-teal-500/50 h-full flex flex-col justify-between">
+                            <div>
+                                <div class="flex justify-between items-start">
+                                    <div style="transform: translateZ(20px);">
+                                        <h3 class="text-slate-400 font-medium">Équipements</h3>
+                                        <p id="total-equipments-kpi" class="text-4xl font-bold text-white">${equipments.length}</p>
+                                    </div>
+                                    <div class="p-3 bg-teal-500 rounded-lg" style="transform: translateZ(30px);">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="space-y-2 mt-4" style="transform: translateZ(10px);">
+                               <select id="equip-filter-loc" class="form-input text-sm py-1"><option value="all">Toutes localisations</option></select>
+                               <select id="equip-filter-des" class="form-input text-sm py-1"><option value="all">Toutes désignations</option></select>
+                            </div>
+                        </div>
+                    `;
+                    
+                    const locFilter = document.getElementById('equip-filter-loc');
+                    const desFilter = document.getElementById('equip-filter-des');
+                    const totalEquipmentsElement = document.getElementById('total-equipments-kpi');
+
+                    const uniqueLocalisations = [...new Set(equipments.map(e => e.localisation?.trim()).filter(Boolean))];
+                    const uniqueDesignations = [...new Set(equipments.map(e => e.designation?.trim()).filter(Boolean))];
+
+                    uniqueLocalisations.forEach(loc => locFilter.innerHTML += `<option value="${loc}">${loc}</option>`);
+                    uniqueDesignations.forEach(des => desFilter.innerHTML += `<option value="${des}">${des}</option>`);
+
+                    const updateEquipmentsKpi = () => {
+                        const selectedLoc = locFilter.value;
+                        const selectedDes = desFilter.value;
+
+                        const filtered = equipments.filter(e => {
+                            const locMatch = selectedLoc === 'all' || e.localisation?.trim() === selectedLoc;
+                            const desMatch = selectedDes === 'all' || e.designation?.trim() === selectedDes;
+                            return locMatch && desMatch;
+                        });
+                        totalEquipmentsElement.textContent = filtered.length;
+                    };
+
+                    locFilter.addEventListener('change', updateEquipmentsKpi);
+                    desFilter.addEventListener('change', updateEquipmentsKpi);
+                }
+            }
             
             setup3dCardEffect();
         }
@@ -1876,7 +2031,7 @@
             const listContainer = document.getElementById('recent-di-list');
             if (!listContainer) return;
         
-            const q = (userRole === 'admin' || userRole === 'manager') 
+            const q = (userRole === 'admin' || userRole === 'manager' || userRole === 'technicien') 
                 ? query(collection(db, `artifacts/${appId}/public/data/DI`)) 
                 : query(collection(db, `artifacts/${appId}/public/data/DI`), where("demandeurId", "==", userId));
 
