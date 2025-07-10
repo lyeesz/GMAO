@@ -4,7 +4,7 @@
     <link rel="manifest" href="manifest.json">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GMAO IPM Web App </title>
+    <title>GMAO Web App - 3D Dark Theme</title>
 
     <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -231,14 +231,24 @@
         </div>
     </div>
 
-    <!-- Modal for adding parts to OT -->
-    <div id="ot-parts-modal" class="fixed inset-0 bg-black bg-opacity-70 hidden z-50 flex items-center justify-center p-4">
+    <!-- NEW Modal for Managing OT (Assigning Technician and Parts) -->
+    <div id="ot-management-modal" class="fixed inset-0 bg-black bg-opacity-70 hidden z-50 flex items-center justify-center p-4">
         <div class="bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-lg border border-slate-700">
-            <h3 class="text-lg font-medium mb-4 text-white">Créer un Ordre de Travail (OT)</h3>
-            <form id="ot-parts-form">
+            <h3 class="text-lg font-medium mb-4 text-white">Gérer l'Ordre de Travail (OT)</h3>
+            <form id="ot-management-form" class="space-y-4">
                 <input type="hidden" id="ot-di-id">
-                <p class="text-slate-300 mb-4">Avez-vous besoin de pièces de rechange pour cette intervention ?</p>
-                <div class="flex items-center space-x-4 mt-2 mb-4">
+                
+                <!-- Technician Assignment -->
+                <div>
+                    <label for="ot-technician-select" class="text-sm font-medium text-slate-300">Assigner un technicien</label>
+                    <select id="ot-technician-select" class="form-input mt-1">
+                        <!-- Options will be populated by JS -->
+                    </select>
+                </div>
+
+                <!-- Spare Parts -->
+                <p class="text-slate-300 pt-2">Avez-vous besoin de pièces de rechange pour cette intervention ?</p>
+                <div class="flex items-center space-x-4">
                     <label class="flex items-center"><input type="radio" name="ot-use-parts" value="no" class="bg-slate-900 border-slate-600 text-indigo-500 focus:ring-indigo-500" checked>&nbsp;<span class="text-slate-300">Non</span></label>
                     <label class="flex items-center"><input type="radio" name="ot-use-parts" value="yes" class="bg-slate-900 border-slate-600 text-indigo-500 focus:ring-indigo-500">&nbsp;<span class="text-slate-300">Oui</span></label>
                 </div>
@@ -254,13 +264,15 @@
                         <input id="ot-part-quantity" type="number" min="1" placeholder="1" class="form-input mt-1">
                     </div>
                 </div>
+                
                 <div class="mt-6 flex justify-end space-x-2">
-                    <button type="button" id="cancel-ot-parts-btn" class="btn btn-secondary">Annuler</button>
-                    <button type="submit" class="btn btn-primary">Confirmer et Créer OT</button>
+                    <button type="button" id="cancel-ot-management-btn" class="btn btn-secondary">Annuler</button>
+                    <button type="submit" class="btn btn-primary">Sauvegarder et Créer OT</button>
                 </div>
             </form>
         </div>
     </div>
+
 
     <script type="module">
         // Firebase modules
@@ -291,6 +303,7 @@
         let allParts = []; 
         let allPreventiveTasks = [];
         let allContracts = [];
+        let allTechniciens = []; // NEW: Cache for technicians
         
         let notificationListenerUnsubscribe = null; // To prevent multiple listeners
         let knownNotificationIds = new Set(); // To track shown notifications
@@ -354,7 +367,7 @@
                         
                         const userProfile = await fetchUserProfile(user.uid);
 
-                        // NEW: Check if user account is disabled
+                        // Check if user account is disabled
                         if (userProfile.disabled) {
                             await signOut(auth);
                             showNotification('Accès refusé', 'Votre compte a été désactivé par un administrateur.', 'error');
@@ -602,8 +615,7 @@
                 e.preventDefault();
                 try {
                     await signInWithEmailAndPassword(auth, e.target['login-email'].value, e.target['login-password'].value);
-                    // The onAuthStateChanged listener will handle routing. We don't need to show a success message here
-                    // as the user will be taken to the dashboard or verification screen.
+                    // The onAuthStateChanged listener will handle routing.
                 } catch (error) {
                     showNotification('Erreur de connexion', error.message, 'error');
                 }
@@ -862,7 +874,6 @@
         }
         
         function renderDashboard() {
-            // MODIFIED: Conditional content based on role
             const isDemandeur = userRole === 'demandeur';
             const dashboardTitle = isDemandeur ? "Vos Demandes" : "Tableau de Bord";
             const chartsGridClass = isDemandeur ? "grid-cols-1 lg:grid-cols-2 gap-4 md:gap-8" : "grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4 md:gap-8";
@@ -884,16 +895,13 @@
             const chartContainer = document.getElementById('charts-dashboard');
             if(!chartContainer) return;
 
-            // MODIFIED: Check role to determine which charts and data to load
             const isDemandeur = userRole === 'demandeur';
 
-            // --- Step 1: Fetch Data ---
-            // DIs are fetched based on role
+            // Fetch Data
             const diQuery = isDemandeur
                 ? query(collection(db, `artifacts/${appId}/public/data/DI`), where("demandeurId", "==", userId))
                 : collection(db, `artifacts/${appId}/public/data/DI`);
 
-            // Other data is only fetched for non-demandeurs
             const dataPromises = [getDocs(diQuery)];
             if (!isDemandeur) {
                 dataPromises.push(getDocs(collection(db, `artifacts/${appId}/public/data/spareParts`)));
@@ -910,7 +918,7 @@
                 equipments = snapshots[2].docs.map(doc => doc.data());
             }
 
-            // --- Step 2: Render Chart Containers ---
+            // Render Chart Containers
             let chartsHTML = `
                 <div class="bg-slate-800/70 backdrop-blur-sm p-4 md:p-6 rounded-xl border border-slate-700 ${!isDemandeur ? 'col-span-1 lg:col-span-2 xl:col-span-1' : ''}"><canvas id="interventionTypeChart"></canvas></div>
                 <div class="bg-slate-800/70 backdrop-blur-sm p-4 md:p-6 rounded-xl border border-slate-700"><canvas id="interventionStatusChart"></canvas></div>
@@ -923,8 +931,7 @@
             }
             chartContainer.innerHTML = chartsHTML;
 
-            // --- Step 3: Populate Charts ---
-            // Chart 1: Intervention Types (always rendered, but with filtered data for demandeur)
+            // Populate Charts
             const typeCounts = interventions.reduce((acc, di) => {
                 acc[di.type] = (acc[di.type] || 0) + 1;
                 return acc;
@@ -953,7 +960,6 @@
                 });
             }
 
-            // Chart 2: Intervention Status (always rendered, but with filtered data for demandeur)
             const statusOrder = ['nouvelle', 'planifiée', 'en cours', 'clôturée'];
             const statusCounts = interventions.reduce((acc, di) => {
                 acc[di.status] = (acc[di.status] || 0) + 1;
@@ -985,20 +991,14 @@
                 });
             }
 
-            // Charts 3 & 4 (only for manager/admin)
             if (!isDemandeur) {
-                // Chart 3: Stock Status
                 const stockStatus = { ok: 0, low: 0, critical: 0 };
                 parts.forEach(part => {
                     const stock = parseInt(part.stock, 10);
                     const stockMin = parseInt(part.stockMin, 10);
-                    if (stock === 0) {
-                        stockStatus.critical++;
-                    } else if (stock < stockMin) {
-                        stockStatus.low++;
-                    } else {
-                        stockStatus.ok++;
-                    }
+                    if (stock === 0) stockStatus.critical++;
+                    else if (stock < stockMin) stockStatus.low++;
+                    else stockStatus.ok++;
                 });
 
                 if (document.getElementById('stockStatusChart')) {
@@ -1013,21 +1013,13 @@
                             }]
                         },
                         options: {
-                            indexAxis: 'y',
-                            responsive: true,
-                            plugins: {
-                                legend: { display: false },
-                                title: { display: true, text: 'État des Stocks', color: '#cbd5e1', font: { size: 16 } }
-                            },
-                            scales: {
-                                y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
-                                x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }
-                            }
+                            indexAxis: 'y', responsive: true,
+                            plugins: { legend: { display: false }, title: { display: true, text: 'État des Stocks', color: '#cbd5e1', font: { size: 16 } } },
+                            scales: { y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }, x: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } } }
                         }
                     });
                 }
                 
-                // KPI Card: Total Equipment
                 const equipKpiContainer = document.getElementById('total-equipments-kpi-container');
                 if (equipKpiContainer) {
                     equipKpiContainer.innerHTML = `
@@ -1061,14 +1053,10 @@
                     uniqueDesignations.forEach(des => desFilter.innerHTML += `<option value="${des}">${des}</option>`);
 
                     const updateEquipmentsKpi = () => {
-                        const selectedLoc = locFilter.value;
-                        const selectedDes = desFilter.value;
-
-                        const filtered = equipments.filter(e => {
-                            const locMatch = selectedLoc === 'all' || e.localisation?.trim() === selectedLoc;
-                            const desMatch = selectedDes === 'all' || e.designation?.trim() === selectedDes;
-                            return locMatch && desMatch;
-                        });
+                        const filtered = equipments.filter(e => 
+                            (locFilter.value === 'all' || e.localisation?.trim() === locFilter.value) &&
+                            (desFilter.value === 'all' || e.designation?.trim() === desFilter.value)
+                        );
                         totalEquipmentsElement.textContent = filtered.length;
                     };
 
@@ -1111,7 +1099,9 @@
                     createdAt: serverTimestamp(),
                     status: 'nouvelle',
                     isOT: false,
-                    usedParts: []
+                    usedParts: [],
+                    assignedTechnicienId: null,
+                    assignedTechnicienEmail: null,
                 };
                 try {
                     const docRef = await addDoc(collection(db, `artifacts/${appId}/public/data/DI`), diData);
@@ -1155,7 +1145,8 @@
                 const listContainer = document.getElementById('di-list-container');
                 if(!listContainer) return;
                 
-                allDIsForExport = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                const allDIs = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                allDIsForExport = allDIs;
 
                 if (querySnapshot.empty) {
                     listContainer.innerHTML = '<p class="text-slate-400">Aucune demande d\'intervention pour le moment.</p>';
@@ -1165,7 +1156,7 @@
                 listContainer.innerHTML = '';
                 let hasCloturee = false;
 
-                allDIsForExport.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)).forEach((di) => {
+                allDIs.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)).forEach((di) => {
                     const diId = di.id;
                     const date = di.createdAt?.toDate().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }) || 'N/A';
                     
@@ -1178,6 +1169,7 @@
                     }
                     
                     const adminDeleteButton = (userRole === 'admin') ? `<button data-di-id="${diId}" class="delete-di-btn text-white bg-red-800 hover:bg-red-900 font-semibold py-1 px-3 text-sm rounded-md transition-colors w-full sm:w-auto">Supprimer</button>` : '';
+                    const assignedTechnicianHtml = di.assignedTechnicienEmail ? `<p class="text-sm text-purple-400 mt-2">Assigné à : ${di.assignedTechnicienEmail}</p>` : '';
 
                     let usedPartsHtml = '';
                     if (di.usedParts && di.usedParts.length > 0) {
@@ -1210,10 +1202,11 @@
                                 <p class="text-slate-300 mt-1">${di.description}</p>
                                 <p class="text-sm text-slate-500 mt-2">Demandé le: ${date} par ${di.demandeurEmail}</p>
                                 ${di.closedAt ? `<p class="text-sm text-slate-500">Clôturé le: ${di.closedAt.toDate().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })}</p>` : ''}
+                                ${assignedTechnicianHtml}
                             </div>
                             <div class="flex flex-col items-stretch sm:items-end space-y-2 flex-shrink-0 w-full sm:w-auto">
                                <span class="text-sm font-semibold px-3 py-1 rounded-full ${statusColor} text-center">${di.status}</span>
-                               ${(userRole === 'manager' || userRole === 'admin') && !di.isOT ? `<button data-di-id="${diId}" class="create-ot-btn text-white bg-green-600 hover:bg-green-700 font-semibold py-1 px-3 text-sm rounded-md transition-colors">Créer OT</button>` : ''}
+                               ${(userRole === 'manager' || userRole === 'admin') && di.status !== 'clôturée' ? `<button data-di-id="${diId}" class="manage-ot-btn text-white bg-green-600 hover:bg-green-700 font-semibold py-1 px-3 text-sm rounded-md transition-colors">${di.isOT ? 'Gérer OT' : 'Créer OT'}</button>` : ''}
                                ${(userRole === 'manager' || userRole === 'admin' || userRole === 'technicien') && di.isOT && di.status !== 'clôturée' ? `<button data-di-id="${diId}" class="close-ot-btn text-white bg-red-600 hover:bg-red-700 font-semibold py-1 px-3 text-sm rounded-md transition-colors">Clôturer</button>` : ''}
                                ${adminDeleteButton}
                             </div>
@@ -1224,8 +1217,8 @@
                 
                 document.getElementById('export-interventions-btn').classList.toggle('hidden', !hasCloturee);
 
-                document.querySelectorAll('.create-ot-btn').forEach(button => {
-                    button.addEventListener('click', (e) => openOtPartsModal(e.target.dataset.diId));
+                document.querySelectorAll('.manage-ot-btn').forEach(button => {
+                    button.addEventListener('click', (e) => openOtManagementModal(e.target.dataset.diId));
                 });
                 document.querySelectorAll('.close-ot-btn').forEach(button => {
                     button.addEventListener('click', (e) => closeOT(e.target.dataset.diId));
@@ -1252,16 +1245,7 @@
             const dataToExport = allDIs
                 .filter(di => selectedIds.includes(di.id))
                 .map(di => {
-                    const formatDate = (timestamp) => {
-                        return timestamp ? timestamp.toDate().toLocaleString('fr-FR', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                        }) : 'N/A';
-                    };
-
+                    const formatDate = (timestamp) => timestamp ? timestamp.toDate().toLocaleString('fr-FR') : 'N/A';
                     const usedPartsString = (di.usedParts && di.usedParts.length > 0)
                         ? di.usedParts.map(p => `${p.partName} (Qté: ${p.quantity})`).join(', ')
                         : 'Aucune';
@@ -1274,6 +1258,7 @@
                         'Localisation/Équipement': di.location,
                         'Description': di.description,
                         'Demandeur': di.demandeurEmail,
+                        'Technicien Assigné': di.assignedTechnicienEmail || 'Non assigné',
                         'Date de Création': formatDate(di.createdAt),
                         'Date de Clôture': formatDate(di.closedAt),
                         'Pièces Utilisées': usedPartsString,
@@ -1289,102 +1274,133 @@
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, "Interventions Clôturées");
             
-            // Auto-size columns for better readability
-            const objectMaxLength = [];
-            dataToExport.forEach(obj => {
+            const objectMaxLength = dataToExport.reduce((acc, obj) => {
                 Object.keys(obj).forEach((key, i) => {
                     const len = (obj[key] || '').toString().length;
-                    objectMaxLength[i] = Math.max(objectMaxLength[i] || 0, len);
+                    acc[i] = Math.max(acc[i] || 0, len);
                 });
-            });
-            // Also consider header length
-            Object.keys(dataToExport[0]).forEach((key, i) => {
-                objectMaxLength[i] = Math.max(objectMaxLength[i], key.length);
-            });
-            worksheet["!cols"] = objectMaxLength.map(w => ({ wch: w + 2 })); // Add a little padding
+                return acc;
+            }, Object.keys(dataToExport[0]).map(key => key.length));
+            worksheet["!cols"] = objectMaxLength.map(w => ({ wch: w + 2 }));
 
             XLSX.writeFile(workbook, "Export_Interventions_Cloturees.xlsx");
             logActivity('export_interventions', { count: dataToExport.length });
             showNotification("Exportation", "Le fichier est en cours de téléchargement.", "info");
         }
         
-        async function openOtPartsModal(diId) {
-            const modal = document.getElementById('ot-parts-modal');
+        async function openOtManagementModal(diId) {
+            const modal = document.getElementById('ot-management-modal');
+            const form = document.getElementById('ot-management-form');
+            form.reset();
             modal.classList.remove('hidden');
 
             document.getElementById('ot-di-id').value = diId;
-            const form = document.getElementById('ot-parts-form');
-            form.reset(); // Reset form state
+            const diDocRef = doc(db, `artifacts/${appId}/public/data/DI`, diId);
+            const diDocSnap = await getDoc(diDocRef);
+            const diData = diDocSnap.data();
 
-            // Fetch parts if not already in cache
+            // Fetch technicians if cache is empty
+            if (allTechniciens.length === 0) {
+                try {
+                    const techQuery = query(collection(db, `artifacts/${appId}/users`), where("role", "==", "technicien"), where("disabled", "==", false));
+                    const snapshot = await getDocs(techQuery);
+                    allTechniciens = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
+                } catch (error) {
+                    console.error("Failed to fetch technicians:", error);
+                }
+            }
+
+            // Populate technician dropdown
+            const techSelect = document.getElementById('ot-technician-select');
+            techSelect.innerHTML = `<option value="">-- Choisir un technicien --</option>` + 
+                allTechniciens.map(tech => `<option value="${tech.id}" data-email="${tech.email}">${tech.email}</option>`).join('');
+            
+            // Pre-select technician if already assigned
+            if (diData.assignedTechnicienId) {
+                techSelect.value = diData.assignedTechnicienId;
+            }
+
+            // Fetch parts if cache is empty
             if (allParts.length === 0) {
                 try {
-                    const partsCollectionRef = collection(db, `artifacts/${appId}/public/data/spareParts`);
-                    const snapshot = await getDocs(partsCollectionRef);
-                    allParts = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
+                    const partsSnapshot = await getDocs(collection(db, `artifacts/${appId}/public/data/spareParts`));
+                    allParts = partsSnapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
                 } catch (error) {
                     console.error("Failed to fetch spare parts:", error);
                 }
             }
-
+            
+            // Populate parts dropdown
             const partsSelect = document.getElementById('ot-part-select');
             partsSelect.innerHTML = `<option value="">-- Choisir une pièce --</option>` + 
                 allParts.map(part => `<option value="${part.id}">${part.designation} (Stock: ${part.stock})</option>`).join('');
 
+            // Setup parts radio button logic
             document.querySelectorAll('input[name="ot-use-parts"]').forEach(radio => {
                 radio.addEventListener('change', (e) => {
-                    const container = document.getElementById('ot-parts-usage-container');
-                    container.classList.toggle('hidden', e.target.value === 'no');
+                    document.getElementById('ot-parts-usage-container').classList.toggle('hidden', e.target.value === 'no');
                 });
             });
             
-            document.getElementById('cancel-ot-parts-btn').addEventListener('click', () => modal.classList.add('hidden'));
-
-            form.onsubmit = async (e) => {
-                e.preventDefault();
-                const useParts = document.querySelector('input[name="ot-use-parts"]:checked').value === 'yes';
-                let usedPartsInfo = null;
-
-                if (useParts) {
-                    const partId = document.getElementById('ot-part-select').value;
-                    const quantity = parseInt(document.getElementById('ot-part-quantity').value, 10);
-                    
-                    if (!partId || !quantity || quantity <= 0) {
-                        showNotification("Données manquantes", "Veuillez sélectionner une pièce et une quantité valide.", "warning");
-                        return;
-                    }
-                    const partToUpdate = allParts.find(p => p.id === partId);
-                    if (!partToUpdate || partToUpdate.stock < quantity) {
-                        showNotification("Stock Insuffisant", `Le stock pour ${partToUpdate.designation} est insuffisant.`, "error");
-                        return;
-                    }
-                    usedPartsInfo = {
-                        partId: partId,
-                        partName: partToUpdate.designation,
-                        quantity: quantity,
-                        newStock: partToUpdate.stock - quantity
-                    };
-                }
-                
-                await createOTFromDI(diId, usedPartsInfo);
-                modal.classList.add('hidden');
-            };
+            document.getElementById('cancel-ot-management-btn').addEventListener('click', () => modal.classList.add('hidden'));
+            form.onsubmit = (e) => handleSaveOtManagement(e);
         }
 
-        async function createOTFromDI(diId, usedPartsInfo) {
-            const diDocRef = doc(db, `artifacts/${appId}/public/data/DI`, diId);
+        async function handleSaveOtManagement(e) {
+            e.preventDefault();
+            const diId = document.getElementById('ot-di-id').value;
+            const techSelect = document.getElementById('ot-technician-select');
+            const selectedTechOption = techSelect.options[techSelect.selectedIndex];
             
+            const technicienId = selectedTechOption.value;
+            const technicienEmail = selectedTechOption.dataset.email;
+
+            if (!technicienId) {
+                showNotification("Technicien manquant", "Veuillez assigner un technicien.", "warning");
+                return;
+            }
+
+            const useParts = document.querySelector('input[name="ot-use-parts"]:checked').value === 'yes';
+            let usedPartsInfo = null;
+            let usedPartsData = [];
+
+            if (useParts) {
+                const partId = document.getElementById('ot-part-select').value;
+                const quantity = parseInt(document.getElementById('ot-part-quantity').value, 10);
+                
+                if (!partId || !quantity || quantity <= 0) {
+                    showNotification("Données pièces manquantes", "Veuillez sélectionner une pièce et une quantité valide.", "warning");
+                    return;
+                }
+                const partToUpdate = allParts.find(p => p.id === partId);
+                if (!partToUpdate || partToUpdate.stock < quantity) {
+                    showNotification("Stock Insuffisant", `Le stock pour ${partToUpdate.designation} est insuffisant.`, "error");
+                    return;
+                }
+                usedPartsInfo = {
+                    partId: partId,
+                    newStock: partToUpdate.stock - quantity
+                };
+                usedPartsData = [{
+                    partId: partId,
+                    partName: partToUpdate.designation,
+                    quantity: quantity
+                }];
+            }
+            
+            // Save all data in a batch
+            const diDocRef = doc(db, `artifacts/${appId}/public/data/DI`, diId);
             try {
                 const batch = writeBatch(db);
+                const updateData = { 
+                    isOT: true, 
+                    status: 'planifiée',
+                    assignedTechnicienId: technicienId,
+                    assignedTechnicienEmail: technicienEmail,
+                    usedParts: usedPartsData
+                };
 
-                const updateData = { isOT: true, status: 'planifiée' };
                 if (usedPartsInfo) {
-                    updateData.usedParts = [{
-                        partId: usedPartsInfo.partId,
-                        partName: usedPartsInfo.partName,
-                        quantity: usedPartsInfo.quantity
-                    }];
-                    
                     const partDocRef = doc(db, `artifacts/${appId}/public/data/spareParts`, usedPartsInfo.partId);
                     batch.update(partDocRef, { stock: usedPartsInfo.newStock });
                 }
@@ -1392,10 +1408,11 @@
                 batch.update(diDocRef, updateData);
                 await batch.commit();
                 
-                await logActivity('create_ot', { diId: diId });
-                showNotification("OT Créé", "L'ordre de travail a été créé avec succès.", "success");
-            } catch(e) {
-                showNotification("Erreur", `La création de l'OT a échoué: ${e.message}`, "error");
+                await logActivity('manage_ot', { diId: diId, assignedTechnician: technicienEmail });
+                showNotification("OT Sauvegardé", "L'ordre de travail a été créé/mis à jour.", "success");
+                document.getElementById('ot-management-modal').classList.add('hidden');
+            } catch(error) {
+                showNotification("Erreur", `La sauvegarde de l'OT a échoué: ${error.message}`, "error");
             }
         }
 
@@ -1404,7 +1421,7 @@
              try {
                 await updateDoc(diDocRef, { 
                     status: 'clôturée',
-                    closedAt: serverTimestamp() // Add closing timestamp
+                    closedAt: serverTimestamp()
                 });
                 await logActivity('close_ot', { diId: diId });
                 showNotification("Intervention Clôturée", "L'intervention a été clôturée avec succès.", "success");
@@ -1553,9 +1570,10 @@
                         
                         const otEvents = otSnapshot.docs.map(doc => {
                             const data = doc.data();
+                            const techName = data.assignedTechnicienEmail ? data.assignedTechnicienEmail.split('@')[0] : 'N/A';
                             return {
                                 id: doc.id,
-                                title: `OT: ${data.type} - ${data.location}`,
+                                title: `OT: ${data.type} - ${techName}`,
                                 start: data.plannedAt?.toDate() || data.createdAt.toDate(), 
                                 allDay: true,
                                 backgroundColor: data.status === 'clôturée' ? '#10b981' : (data.status === 'planifiée' ? '#4f46e5' : '#f59e0b'),
@@ -1578,16 +1596,10 @@
                         });
 
                         const frequencyMap = {
-                            weekly: 'WEEKLY',
-                            monthly: 'MONTHLY',
-                            quarterly: 'MONTHLY',
-                            semestrial: 'MONTHLY',
-                            yearly: 'YEARLY'
+                            weekly: 'WEEKLY', monthly: 'MONTHLY', quarterly: 'MONTHLY',
+                            semestrial: 'MONTHLY', yearly: 'YEARLY'
                         };
-                        const intervalMap = {
-                            quarterly: 3,
-                            semestrial: 6
-                        };
+                        const intervalMap = { quarterly: 3, semestrial: 6 };
 
                         const preventiveEvents = preventiveTasksSnapshot.docs.map(doc => {
                             const task = doc.data();
@@ -1616,7 +1628,7 @@
             });
             calendar.render();
 
-            // --- Add Modal Listeners ---
+            // --- Modal Listeners ---
             document.getElementById('close-modal-btn').addEventListener('click', () => {
                 document.getElementById('event-modal').classList.add('hidden');
             });
@@ -1640,13 +1652,8 @@
                 }
             });
 
-            // --- Edit/Delete Modal Listeners ---
             const editModal = document.getElementById('edit-event-modal');
-            
-            document.getElementById('cancel-edit-modal-btn').addEventListener('click', () => {
-                editModal.classList.add('hidden');
-            });
-
+            document.getElementById('cancel-edit-modal-btn').addEventListener('click', () => editModal.classList.add('hidden'));
             document.getElementById('edit-event-form').addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const eventId = document.getElementById('edit-event-id').value;
@@ -1700,7 +1707,6 @@
                 if (!container) return;
                 container.innerHTML = '';
                 snapshot.forEach(userDoc => {
-                    // Admin cannot edit their own account from this panel
                     if (userDoc.id === currentUser.uid) return;
 
                     const userData = userDoc.data();
@@ -1731,35 +1737,25 @@
                     container.appendChild(userCard);
                 });
 
-                // --- Attach event listeners ---
                 document.querySelectorAll('.change-role-select').forEach(select => {
-                    select.addEventListener('change', async (e) => {
+                    select.addEventListener('change', (e) => {
                         const newRole = e.target.value;
                         const uidToUpdate = e.target.dataset.uid;
-                        const userDocRef = doc(db, `artifacts/${appId}/users`, uidToUpdate);
-                        try {
-                           await updateDoc(userDocRef, { role: newRole });
-                           await logActivity('change_user_role', { targetUserId: uidToUpdate, newRole: newRole });
-                           showNotification("Rôle mis à jour", "Le rôle de l'utilisateur a été modifié.", "success");
-                        } catch (error) {
-                           showNotification("Erreur", error.message, "error");
-                        }
+                        updateDoc(doc(db, `artifacts/${appId}/users`, uidToUpdate), { role: newRole });
+                        logActivity('change_user_role', { targetUserId: uidToUpdate, newRole: newRole });
+                        showNotification("Rôle mis à jour", "Le rôle de l'utilisateur a été modifié.", "success");
                     });
                 });
 
                 document.querySelectorAll('.toggle-status-btn').forEach(button => {
                     button.addEventListener('click', (e) => {
-                        const uidToUpdate = e.currentTarget.dataset.uid;
-                        const currentStatus = e.currentTarget.dataset.disabled === 'true';
-                        toggleUserStatus(uidToUpdate, currentStatus);
+                        toggleUserStatus(e.currentTarget.dataset.uid, e.currentTarget.dataset.disabled === 'true');
                     });
                 });
 
                 document.querySelectorAll('.delete-user-btn').forEach(button => {
                     button.addEventListener('click', (e) => {
-                        const uidToDelete = e.currentTarget.dataset.uid;
-                        const userEmail = e.currentTarget.dataset.email;
-                        openDeleteUserModal(uidToDelete, userEmail);
+                        openDeleteUserModal(e.currentTarget.dataset.uid, e.currentTarget.dataset.email);
                     });
                 });
             });
@@ -1785,11 +1781,8 @@
             title.textContent = "Supprimer l'utilisateur";
             text.innerHTML = `Êtes-vous sûr de vouloir supprimer définitivement l'utilisateur <strong>${email}</strong> ? <br><strong class="text-amber-400">Attention :</strong> Cette action ne supprime que le profil de la base de données de l'application. Pour une suppression complète, l'utilisateur doit être supprimé du panneau d'authentification Firebase.`;
 
-            const handler = async () => {
-                await deleteUserFromFirestore(uid);
-            };
-
-            // Clone and replace the button to ensure only one listener is attached
+            const handler = () => deleteUserFromFirestore(uid);
+            
             const newConfirmBtn = confirmBtn.cloneNode(true);
             confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
             newConfirmBtn.addEventListener('click', handler);
@@ -1798,11 +1791,6 @@
         }
 
         async function deleteUserFromFirestore(uid) {
-            // IMPORTANT: This function only deletes the user's profile from Firestore.
-            // For a complete and secure deletion, you MUST implement a Firebase Cloud Function that
-            // uses the Firebase Admin SDK to delete the user from Firebase Authentication.
-            // Calling auth.deleteUser() on the client for other users is not possible for security reasons.
-            // Example Cloud Function: https://firebase.google.com/docs/functions/callable
             if (!uid) return;
             const userDocRef = doc(db, `artifacts/${appId}/users`, uid);
             try {
@@ -1930,23 +1918,17 @@
             document.getElementById('confirm-import-btn').addEventListener('click', handleImportCSV);
             document.getElementById('export-csv-btn').addEventListener('click', handleExportCSV);
             
-            // Listener for table body clicks (edit/delete)
             document.getElementById('equipments-list-container').addEventListener('click', (e) => {
                 const editBtn = e.target.closest('.edit-btn');
                 const deleteBtn = e.target.closest('.delete-btn');
-                if(editBtn) {
-                    openEquipmentModal(editBtn.dataset.id);
-                }
-                if(deleteBtn) {
-                    openDeleteModal(deleteBtn.dataset.id, 'equipment');
-                }
+                if(editBtn) openEquipmentModal(editBtn.dataset.id);
+                if(deleteBtn) openDeleteModal(deleteBtn.dataset.id, 'equipment');
             });
 
-            // Real-time listener for equipment
             const equipmentsCollectionRef = collection(db, `artifacts/${appId}/public/data/equipements`);
             onSnapshot(equipmentsCollectionRef, (snapshot) => {
                 allEquipments = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
-                applyFilters(); // Display with current filters applied
+                applyFilters();
             });
         }
         
@@ -1955,16 +1937,11 @@
             const marque = document.getElementById('filter-marque')?.value.toLowerCase() || '';
             const localisation = document.getElementById('filter-localisation')?.value.toLowerCase() || '';
 
-            const filteredEquipments = allEquipments.filter(equip => {
-                const equipDesignation = (equip.designation || '').toLowerCase();
-                const equipMarque = (equip.marque || '').toLowerCase();
-                const equipLocalisation = (equip.localisation || '').toLowerCase();
-
-                return equipDesignation.includes(designation) &&
-                       equipMarque.includes(marque) &&
-                       equipLocalisation.includes(localisation);
-            });
-
+            const filteredEquipments = allEquipments.filter(equip => 
+                (equip.designation || '').toLowerCase().includes(designation) &&
+                (equip.marque || '').toLowerCase().includes(marque) &&
+                (equip.localisation || '').toLowerCase().includes(localisation)
+            );
             displayEquipments(filteredEquipments);
         }
 
@@ -1976,7 +1953,6 @@
             document.getElementById('equip-id').value = '';
 
             if (id) {
-                // Edit mode
                 title.textContent = "Modifier l'équipement";
                 const equip = allEquipments.find(e => e.id === id);
                 if(equip) {
@@ -1991,7 +1967,6 @@
                     document.getElementById('equip-fournisseur').value = equip.fournisseur || '';
                 }
             } else {
-                // Add mode
                 title.textContent = "Ajouter un équipement";
             }
             modal.classList.remove('hidden');
@@ -2017,13 +1992,10 @@
 
             try {
                 if (id) {
-                    // Update
-                    const docRef = doc(db, `artifacts/${appId}/public/data/equipements`, id);
-                    await updateDoc(docRef, equipData);
+                    await updateDoc(doc(db, `artifacts/${appId}/public/data/equipements`, id), equipData);
                     await logActivity('edit_equipment', { equipmentId: id, designation: equipData.designation });
                     showNotification("Équipement mis à jour", "Les modifications ont été enregistrées.", "success");
                 } else {
-                    // Create
                     equipData.createdAt = serverTimestamp();
                     const docRef = await addDoc(collection(db, `artifacts/${appId}/public/data/equipements`), equipData);
                     await logActivity('create_equipment', { equipmentId: docRef.id, designation: equipData.designation });
@@ -2041,7 +2013,6 @@
             const title = modal.querySelector('#delete-modal-title');
             const text = modal.querySelector('#delete-modal-text');
 
-            // Reset to default text first
             title.textContent = "Confirmer la suppression";
             text.innerHTML = "Êtes-vous sûr de vouloir supprimer cet élément ? Cette action est irréversible.";
             
@@ -2054,7 +2025,6 @@
                 else if (type === 'contract') await deleteContract(id);
             };
             
-            // Clone and replace the button to ensure only one listener is attached
             const newConfirmBtn = confirmBtn.cloneNode(true);
             confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
             newConfirmBtn.addEventListener('click', handler);
@@ -2076,7 +2046,7 @@
         function displayEquipments(equipments) {
             const container = document.getElementById('equipments-list-container');
             if(!container) return;
-            container.innerHTML = ''; // Clear previous content
+            container.innerHTML = '';
             if(equipments.length === 0) {
                 container.innerHTML = '<tr><td colspan="7" class="text-center p-4 text-slate-500">Aucun équipement correspondant.</td></tr>';
                 return;
@@ -2140,8 +2110,7 @@
                     const equipData = {};
                     requiredHeaders.forEach(requiredHeader => {
                         const index = headersFromCSV.indexOf(requiredHeader);
-                        const cellValue = (index !== -1 && row[index] !== null && row[index] !== undefined) ? row[index] : '';
-                        equipData[requiredHeader] = cellValue;
+                        equipData[requiredHeader] = (index !== -1 && row[index] !== null && row[index] !== undefined) ? row[index] : '';
                     });
                     
                     equipData.createdAt = serverTimestamp();
@@ -2289,13 +2258,11 @@
             `;
             renderPage('Gestion des Pièces et Stocks', content);
 
-            // --- Event Listeners for Parts Page ---
             document.getElementById('add-part-btn').addEventListener('click', () => openPartModal());
             document.getElementById('cancel-part-btn').addEventListener('click', closePartModal);
             document.getElementById('part-form').addEventListener('submit', handleSavePart);
             document.getElementById('parts-filter-input').addEventListener('keyup', (e) => applyPartsFilter(e.target.value));
             
-            // Real-time listener for parts
             const partsCollectionRef = collection(db, `artifacts/${appId}/public/data/spareParts`);
             onSnapshot(partsCollectionRef, (snapshot) => {
                 allParts = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
@@ -2319,11 +2286,8 @@
                 const stock = parseInt(part.stock, 10);
                 const stockMin = parseInt(part.stockMin, 10);
                 let stockColor = 'text-green-400';
-                if (stock < stockMin) {
-                    stockColor = 'text-red-400 font-bold';
-                } else if (stock <= stockMin * 1.2) { // Alert when stock is 20% above minimum
-                    stockColor = 'text-yellow-400';
-                }
+                if (stock < stockMin) stockColor = 'text-red-400 font-bold';
+                else if (stock <= stockMin * 1.2) stockColor = 'text-yellow-400';
 
                 row.innerHTML = `
                     <td class="px-6 py-4 font-medium text-white whitespace-nowrap">${val(part.designation)}</td>
@@ -2343,7 +2307,6 @@
                 container.appendChild(row);
             });
 
-            // Re-attach listeners for the new buttons
             container.querySelectorAll('.edit-part-btn').forEach(btn => btn.addEventListener('click', (e) => openPartModal(e.currentTarget.dataset.id)));
             container.querySelectorAll('.delete-part-btn').forEach(btn => btn.addEventListener('click', (e) => openDeleteModal(e.currentTarget.dataset.id, 'part')));
         }
@@ -2399,8 +2362,7 @@
 
             try {
                 if (id) {
-                    const docRef = doc(db, `artifacts/${appId}/public/data/spareParts`, id);
-                    await updateDoc(docRef, partData);
+                    await updateDoc(doc(db, `artifacts/${appId}/public/data/spareParts`, id), partData);
                     await logActivity('edit_part', { partId: id, designation: partData.designation });
                     showNotification("Pièce mise à jour", "Les modifications ont été enregistrées.", "success");
                 } else {
@@ -2503,7 +2465,6 @@
             `;
             renderPage('Maintenance Préventive', content);
 
-            // --- Event Listeners ---
             document.getElementById('add-preventive-task-btn').addEventListener('click', () => openPreventiveTaskModal());
             document.getElementById('cancel-preventive-task-btn').addEventListener('click', closePreventiveTaskModal);
             document.getElementById('preventive-task-form').addEventListener('submit', handleSavePreventiveTask);
@@ -2511,7 +2472,6 @@
                 document.getElementById('preventive-task-provider-container').classList.toggle('hidden', e.target.value !== 'provider');
             });
 
-            // Real-time listener for preventive tasks
             const preventiveTasksCollectionRef = collection(db, `artifacts/${appId}/public/data/preventiveTasks`);
             onSnapshot(preventiveTasksCollectionRef, (snapshot) => {
                 allPreventiveTasks = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
@@ -2521,7 +2481,7 @@
 
         function calculateNextDueDate(startDate, frequency) {
             if (!startDate || !frequency) return null;
-            const date = new Date(startDate + 'T00:00:00'); // Ensure it's parsed as local time
+            const date = new Date(startDate + 'T00:00:00');
             switch (frequency) {
                 case 'weekly': date.setDate(date.getDate() + 7); break;
                 case 'monthly': date.setMonth(date.getMonth() + 1); break;
@@ -2530,7 +2490,6 @@
                 case 'yearly': date.setFullYear(date.getFullYear() + 1); break;
                 default: return null;
             }
-            // Return in format
             return date.toISOString().split('T')[0];
         }
 
@@ -2544,11 +2503,8 @@
             }
             
             const frequencyMap = {
-                weekly: 'Hebdomadaire',
-                monthly: 'Mensuelle',
-                quarterly: 'Trimestrielle',
-                semestrial: 'Semestrielle',
-                yearly: 'Annuelle'
+                weekly: 'Hebdomadaire', monthly: 'Mensuelle', quarterly: 'Trimestrielle',
+                semestrial: 'Semestrielle', yearly: 'Annuelle'
             };
 
             tasks.sort((a,b) => new Date(a.startDate) - new Date(b.startDate)).forEach(task => {
@@ -2580,7 +2536,6 @@
                 container.appendChild(row);
             });
 
-            // Re-attach listeners
             container.querySelectorAll('.edit-preventive-btn').forEach(btn => btn.addEventListener('click', (e) => openPreventiveTaskModal(e.currentTarget.dataset.id)));
             container.querySelectorAll('.delete-preventive-btn').forEach(btn => btn.addEventListener('click', (e) => openDeleteModal(e.currentTarget.dataset.id, 'preventive')));
         }
@@ -2620,30 +2575,27 @@
         async function handleSavePreventiveTask(e) {
             e.preventDefault();
             const id = document.getElementById('preventive-task-id').value;
-            const startDate = document.getElementById('preventive-task-start-date').value;
-
             const taskData = {
                 description: document.getElementById('preventive-task-description').value,
                 frequency: document.getElementById('preventive-task-frequency').value,
-                startDate: startDate,
+                startDate: document.getElementById('preventive-task-start-date').value,
                 doneBy: document.getElementById('preventive-task-done-by').value,
                 providerName: document.getElementById('preventive-task-provider-name').value,
             };
 
             try {
-                if (id) { // Update existing task
-                    const taskDocRef = doc(db, `artifacts/${appId}/public/data/preventiveTasks`, id);
-                    await updateDoc(taskDocRef, taskData);
+                if (id) {
+                    await updateDoc(doc(db, `artifacts/${appId}/public/data/preventiveTasks`, id), taskData);
                     await logActivity('edit_preventive_task', { taskId: id, description: taskData.description });
                     showNotification("Tâche mise à jour", "La tâche préventive a été mise à jour.", "success");
-                } else { // Create new task
+                } else {
                     taskData.createdAt = serverTimestamp();
                     const docRef = await addDoc(collection(db, `artifacts/${appId}/public/data/preventiveTasks`), taskData);
                     await logActivity('create_preventive_task', { taskId: docRef.id, description: taskData.description });
                     showNotification("Tâche ajoutée", "La nouvelle tâche préventive a été ajoutée.", "success");
                 }
                 closePreventiveTaskModal();
-                if(window.location.hash === '#/planning') router(); // Refresh calendar if on planning page
+                if(window.location.hash === '#/planning') router();
             } catch (error) {
                 console.error("Error saving preventive task:", error);
                 showNotification("Erreur", error.message, "error");
@@ -2653,20 +2605,18 @@
         async function deletePreventiveTask(id) {
             if (!id) return;
             try {
-                const taskDocRef = doc(db, `artifacts/${appId}/public/data/preventiveTasks`, id);
-                await deleteDoc(taskDocRef);
+                await deleteDoc(doc(db, `artifacts/${appId}/public/data/preventiveTasks`, id));
                 await logActivity('delete_preventive_task', { taskId: id });
-
                 showNotification("Tâche supprimée", "La tâche préventive a été supprimée.", "success");
                 document.getElementById('delete-confirm-modal').classList.add('hidden');
-                if(window.location.hash === '#/planning') router(); // Refresh calendar
+                if(window.location.hash === '#/planning') router();
             } catch (error) {
                 showNotification("Erreur", error.message, "error");
             }
         }
 
         // --- CONTRACTS MANAGEMENT FUNCTIONS ---
-        let tempPeriods = []; // Temporary store for periods in the modal
+        let tempPeriods = [];
 
         function renderContractsPage() {
             if (userRole !== 'manager' && userRole !== 'admin' && userRole !== 'technicien') {
@@ -2765,7 +2715,6 @@
             `;
             renderPage('Gestion des Contrats', content);
 
-            // --- Event Listeners ---
             document.getElementById('add-contract-btn').addEventListener('click', () => openContractModal());
             document.getElementById('cancel-contract-btn').addEventListener('click', closeContractModal);
             document.getElementById('contract-form').addEventListener('submit', handleSaveContract);
@@ -2775,7 +2724,6 @@
                 btn.addEventListener('click', () => switchContractTab(btn.dataset.tab));
             });
 
-            // Listener for table body clicks (edit/delete)
             document.getElementById('contracts-list-container').addEventListener('click', (e) => {
                 const editBtn = e.target.closest('.edit-contract-btn');
                 const deleteBtn = e.target.closest('.delete-contract-btn');
@@ -2783,7 +2731,6 @@
                 if(deleteBtn) openDeleteModal(deleteBtn.dataset.id, 'contract');
             });
 
-            // Real-time listener for contracts
             const contractsCollectionRef = collection(db, `artifacts/${appId}/public/data/contracts`);
             onSnapshot(contractsCollectionRef, (snapshot) => {
                 allContracts = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
@@ -2884,8 +2831,7 @@
 
             try {
                 if (id) {
-                    const docRef = doc(db, `artifacts/${appId}/public/data/contracts`, id);
-                    await updateDoc(docRef, contractData);
+                    await updateDoc(doc(db, `artifacts/${appId}/public/data/contracts`, id), contractData);
                     await logActivity('edit_contract', { contractId: id, code: contractData.code });
                     showNotification("Contrat mis à jour", "Les modifications ont été enregistrées.", "success");
                 } else {
@@ -2969,8 +2915,7 @@
             
             if (allEquipments.length === 0) {
                  try {
-                    const partsCollectionRef = collection(db, `artifacts/${appId}/public/data/equipements`);
-                    const snapshot = await getDocs(partsCollectionRef);
+                    const snapshot = await getDocs(collection(db, `artifacts/${appId}/public/data/equipements`));
                     allEquipments = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
                 } catch (error) {
                     console.error("Failed to fetch equipments:", error);
