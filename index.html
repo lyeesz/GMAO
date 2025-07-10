@@ -4,7 +4,7 @@
     <link rel="manifest" href="manifest.json">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GMAO IPM Web App</title>
+    <title>GMAO IPM Web App </title>
 
     <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -344,16 +344,25 @@
         function setupAuthListener() {
             onAuthStateChanged(auth, async (user) => {
                 if (user && !user.isAnonymous) {
-                    // Define a cutoff date. Users created before this date are exempt from verification.
-                    // This is to grandfather in existing users before the verification feature was added.
-                    const cutoffDate = new Date('2025-07-09T00:00:00Z'); // Set to a specific time when the feature is deployed
+                    const cutoffDate = new Date('2025-07-09T00:00:00Z');
                     const creationDate = new Date(user.metadata.creationTime);
 
                     if (user.emailVerified || creationDate < cutoffDate) {
                         const isNewLogin = !currentUser || currentUser.uid !== user.uid;
                         currentUser = user;
                         userId = user.uid;
-                        await fetchUserRole(user.uid);
+                        
+                        const userProfile = await fetchUserProfile(user.uid);
+
+                        // NEW: Check if user account is disabled
+                        if (userProfile.disabled) {
+                            await signOut(auth);
+                            showNotification('Accès refusé', 'Votre compte a été désactivé par un administrateur.', 'error');
+                            return; // Stop the login process
+                        }
+
+                        userRole = userProfile.role || 'demandeur';
+
                         if (isNewLogin) {
                             await logActivity('login');
                         }
@@ -377,41 +386,45 @@
             });
         }
         
-        async function fetchUserRole(uid) {
+        async function fetchUserProfile(uid) {
             const userDocRef = doc(db, `artifacts/${appId}/users`, uid);
             try {
                 const docSnap = await getDoc(userDocRef);
                 if (docSnap.exists()) {
-                    userRole = docSnap.data().role || 'demandeur';
+                    return docSnap.data();
                 } else {
                     // This is a new user, create their profile
-                    await setDoc(userDocRef, { 
+                    const newUserProfile = { 
                         email: currentUser.email, 
                         role: 'demandeur',
+                        disabled: false, // Ensure new users are not disabled
                         createdAt: serverTimestamp()
-                    });
-                    userRole = 'demandeur';
+                    };
+                    await setDoc(userDocRef, newUserProfile);
                     await logActivity('register');
+                    return newUserProfile;
                 }
             } catch (error) {
-                console.error("Erreur lors de la récupération du rôle de l'utilisateur:", error);
-                userRole = 'demandeur'; // Default role on error
+                console.error("Erreur lors de la récupération du profil de l'utilisateur:", error);
+                // Return a default profile on error to prevent app crash
+                return { role: 'demandeur', disabled: false, email: 'error@loading.com' }; 
             }
         }
 
         // --- ROUTER ---
         function router() {
             const hash = window.location.hash || '#/dashboard';
-            if (!currentUser || !currentUser.emailVerified) {
-                
-                const cutoffDate = new Date('2025-07-09T00:00:00Z');
-                const creationDate = new Date(currentUser.metadata.creationTime);
+            if (!currentUser) {
+                 renderLogin();
+                 return;
+            }
 
-                if (creationDate > cutoffDate) {
-                    if (!currentUser) renderLogin();
-                    else renderEmailVerificationScreen();
-                    return;
-                }
+            const cutoffDate = new Date('2025-07-09T00:00:00Z');
+            const creationDate = new Date(currentUser.metadata.creationTime);
+
+            if (!currentUser.emailVerified && creationDate > cutoffDate) {
+                renderEmailVerificationScreen();
+                return;
             }
             
             // Close mobile sidebar on navigation
@@ -701,7 +714,7 @@
                             <div class="p-2 bg-indigo-600 rounded-lg">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
                             </div>
-                            <h1 class="text-xl font-bold">GMAO IPM</h1>
+                            <h1 class="text-xl font-bold">GMAO Pro</h1>
                         </div>
                         <nav class="flex flex-col space-y-2">${getNavLinks()}</nav>
                     </div>
@@ -728,7 +741,7 @@
                                 <div class="p-2 bg-indigo-600 rounded-lg">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
                                 </div>
-                                <h1 class="text-xl font-bold">GMAO IPM</h1>
+                                <h1 class="text-xl font-bold">GMAO Pro</h1>
                             </div>
                             <button id="close-mobile-sidebar-btn" class="p-1">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
@@ -1672,6 +1685,7 @@
             }
         }
 
+        // --- USER MANAGEMENT (ADMIN) ---
         function renderUsersPage() {
             if (userRole !== 'admin') {
                 renderPage('Accès non autorisé', '<p class="text-red-400">Vous n\'avez pas les droits pour accéder à cette page.</p>');
@@ -1686,24 +1700,38 @@
                 if (!container) return;
                 container.innerHTML = '';
                 snapshot.forEach(userDoc => {
+                    // Admin cannot edit their own account from this panel
+                    if (userDoc.id === currentUser.uid) return;
+
                     const userData = userDoc.data();
+                    const isDisabled = userData.disabled === true;
+
                     const userCard = document.createElement('div');
-                    userCard.className = 'bg-slate-900/50 p-4 rounded-lg border border-slate-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4';
+                    userCard.className = `bg-slate-900/50 p-4 rounded-lg border border-slate-700 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 transition-opacity ${isDisabled ? 'opacity-50' : ''}`;
+                    
+                    const disableButtonText = isDisabled ? 'Activer' : 'Désactiver';
+                    const disableButtonClass = isDisabled ? 'btn-success' : 'btn-warning';
+
                     userCard.innerHTML = `
-                        <div>
+                        <div class="flex-grow">
                             <p class="font-semibold text-white break-all">${userData.email}</p>
-                            <p class="text-sm text-slate-400">Rôle actuel : ${userData.role}</p>
+                            <p class="text-sm text-slate-400">Rôle : ${userData.role} - Statut : <span class="font-semibold">${isDisabled ? 'Désactivé' : 'Activé'}</span></p>
                         </div>
-                        <select data-uid="${userDoc.id}" class="form-input w-full sm:w-48 change-role-select">
-                            <option value="demandeur" ${userData.role === 'demandeur' ? 'selected' : ''}>Demandeur</option>
-                            <option value="technicien" ${userData.role === 'technicien' ? 'selected' : ''}>Technicien</option>
-                            <option value="manager" ${userData.role === 'manager' ? 'selected' : ''}>Manager</option>
-                            <option value="admin" ${userData.role === 'admin' ? 'selected' : ''}>Admin</option>
-                        </select>
+                        <div class="flex flex-col sm:flex-row gap-2 w-full lg:w-auto flex-shrink-0">
+                            <select data-uid="${userDoc.id}" class="form-input w-full sm:w-40 change-role-select">
+                                <option value="demandeur" ${userData.role === 'demandeur' ? 'selected' : ''}>Demandeur</option>
+                                <option value="technicien" ${userData.role === 'technicien' ? 'selected' : ''}>Technicien</option>
+                                <option value="manager" ${userData.role === 'manager' ? 'selected' : ''}>Manager</option>
+                                <option value="admin" ${userData.role === 'admin' ? 'selected' : ''}>Admin</option>
+                            </select>
+                            <button data-uid="${userDoc.id}" data-disabled="${isDisabled}" class="btn ${disableButtonClass} toggle-status-btn w-full sm:w-auto">${disableButtonText}</button>
+                            <button data-uid="${userDoc.id}" data-email="${userData.email}" class="btn btn-danger delete-user-btn w-full sm:w-auto">Supprimer</button>
+                        </div>
                     `;
                     container.appendChild(userCard);
                 });
 
+                // --- Attach event listeners ---
                 document.querySelectorAll('.change-role-select').forEach(select => {
                     select.addEventListener('change', async (e) => {
                         const newRole = e.target.value;
@@ -1718,8 +1746,75 @@
                         }
                     });
                 });
+
+                document.querySelectorAll('.toggle-status-btn').forEach(button => {
+                    button.addEventListener('click', (e) => {
+                        const uidToUpdate = e.currentTarget.dataset.uid;
+                        const currentStatus = e.currentTarget.dataset.disabled === 'true';
+                        toggleUserStatus(uidToUpdate, currentStatus);
+                    });
+                });
+
+                document.querySelectorAll('.delete-user-btn').forEach(button => {
+                    button.addEventListener('click', (e) => {
+                        const uidToDelete = e.currentTarget.dataset.uid;
+                        const userEmail = e.currentTarget.dataset.email;
+                        openDeleteUserModal(uidToDelete, userEmail);
+                    });
+                });
             });
         }
+
+        async function toggleUserStatus(uid, isDisabled) {
+            const userDocRef = doc(db, `artifacts/${appId}/users`, uid);
+            try {
+                await updateDoc(userDocRef, { disabled: !isDisabled });
+                await logActivity('toggle_user_status', { targetUserId: uid, status: !isDisabled ? 'disabled' : 'enabled' });
+                showNotification("Statut mis à jour", `L'utilisateur a été ${!isDisabled ? 'désactivé' : 'activé'}.`, "success");
+            } catch (error) {
+                showNotification("Erreur", `Impossible de mettre à jour le statut: ${error.message}`, "error");
+            }
+        }
+
+        function openDeleteUserModal(uid, email) {
+            const modal = document.getElementById('delete-confirm-modal');
+            const confirmBtn = modal.querySelector('#confirm-delete-btn');
+            const title = modal.querySelector('#delete-modal-title');
+            const text = modal.querySelector('#delete-modal-text');
+
+            title.textContent = "Supprimer l'utilisateur";
+            text.innerHTML = `Êtes-vous sûr de vouloir supprimer définitivement l'utilisateur <strong>${email}</strong> ? <br><strong class="text-amber-400">Attention :</strong> Cette action ne supprime que le profil de la base de données de l'application. Pour une suppression complète, l'utilisateur doit être supprimé du panneau d'authentification Firebase.`;
+
+            const handler = async () => {
+                await deleteUserFromFirestore(uid);
+            };
+
+            // Clone and replace the button to ensure only one listener is attached
+            const newConfirmBtn = confirmBtn.cloneNode(true);
+            confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+            newConfirmBtn.addEventListener('click', handler);
+
+            modal.classList.remove('hidden');
+        }
+
+        async function deleteUserFromFirestore(uid) {
+            // IMPORTANT: This function only deletes the user's profile from Firestore.
+            // For a complete and secure deletion, you MUST implement a Firebase Cloud Function that
+            // uses the Firebase Admin SDK to delete the user from Firebase Authentication.
+            // Calling auth.deleteUser() on the client for other users is not possible for security reasons.
+            // Example Cloud Function: https://firebase.google.com/docs/functions/callable
+            if (!uid) return;
+            const userDocRef = doc(db, `artifacts/${appId}/users`, uid);
+            try {
+                await deleteDoc(userDocRef);
+                await logActivity('delete_user_profile', { deletedUserId: uid });
+                showNotification("Profil Utilisateur Supprimé", "Le profil de l'utilisateur a été supprimé de la base de données de l'application.", "success");
+                document.getElementById('delete-confirm-modal').classList.add('hidden');
+            } catch (error) {
+                showNotification("Erreur", `La suppression du profil a échoué: ${error.message}`, "error");
+            }
+        }
+
 
         function renderEquipmentsPage() {
             if (userRole !== 'manager' && userRole !== 'admin' && userRole !== 'technicien') {
@@ -1943,6 +2038,12 @@
         function openDeleteModal(id, type) {
             const modal = document.getElementById('delete-confirm-modal');
             const confirmBtn = modal.querySelector('#confirm-delete-btn');
+            const title = modal.querySelector('#delete-modal-title');
+            const text = modal.querySelector('#delete-modal-text');
+
+            // Reset to default text first
+            title.textContent = "Confirmer la suppression";
+            text.innerHTML = "Êtes-vous sûr de vouloir supprimer cet élément ? Cette action est irréversible.";
             
             const handler = async () => {
                 if (type === 'equipment') await deleteEquipment(id);
