@@ -231,7 +231,7 @@
         </div>
     </div>
 
-    <!-- NEW Modal for Managing OT (Assigning Technician and Parts) -->
+    <!-- Modal for Managing OT (Assigning Technician and Parts) -->
     <div id="ot-management-modal" class="fixed inset-0 bg-black bg-opacity-70 hidden z-50 flex items-center justify-center p-4">
         <div class="bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-lg border border-slate-700">
             <h3 class="text-lg font-medium mb-4 text-white">Gérer l'Ordre de Travail (OT)</h3>
@@ -303,10 +303,10 @@
         let allParts = []; 
         let allPreventiveTasks = [];
         let allContracts = [];
-        let allTechniciens = []; // NEW: Cache for technicians
+        let allTechniciens = [];
         
-        let notificationListenerUnsubscribe = null; // To prevent multiple listeners
-        let knownNotificationIds = new Set(); // To track shown notifications
+        let notificationListenerUnsubscribe = null;
+        let knownNotificationIds = new Set();
 
         // --- INITIALIZATION ---
         function initApp() {
@@ -323,7 +323,6 @@
                 db = getFirestore(app);
                 setupAuthListener();
                 
-                // Setup global modal listeners once
                 const deleteModal = document.getElementById('delete-confirm-modal');
                 if (deleteModal) {
                     document.getElementById('cancel-delete-btn').addEventListener('click', () => {
@@ -367,11 +366,10 @@
                         
                         const userProfile = await fetchUserProfile(user.uid);
 
-                        // Check if user account is disabled
                         if (userProfile.disabled) {
                             await signOut(auth);
                             showNotification('Accès refusé', 'Votre compte a été désactivé par un administrateur.', 'error');
-                            return; // Stop the login process
+                            return;
                         }
 
                         userRole = userProfile.role || 'demandeur';
@@ -382,12 +380,11 @@
                         setupNotificationListener(); 
                         router();
                     } else {
-                        // User is new and email is not verified
-                        currentUser = user; // Keep user object for resend logic
+                        currentUser = user;
                         renderEmailVerificationScreen();
                     }
                 } else {
-                    if (currentUser) { // Was logged in before
+                    if (currentUser) {
                         logActivity('logout');
                     }
                     currentUser = null;
@@ -406,11 +403,10 @@
                 if (docSnap.exists()) {
                     return docSnap.data();
                 } else {
-                    // This is a new user, create their profile
                     const newUserProfile = { 
                         email: currentUser.email, 
                         role: 'demandeur',
-                        disabled: false, // Ensure new users are not disabled
+                        disabled: false,
                         createdAt: serverTimestamp()
                     };
                     await setDoc(userDocRef, newUserProfile);
@@ -419,7 +415,6 @@
                 }
             } catch (error) {
                 console.error("Erreur lors de la récupération du profil de l'utilisateur:", error);
-                // Return a default profile on error to prevent app crash
                 return { role: 'demandeur', disabled: false, email: 'error@loading.com' }; 
             }
         }
@@ -440,7 +435,6 @@
                 return;
             }
             
-            // Close mobile sidebar on navigation
             closeMobileSidebar();
 
             switch(hash) {
@@ -453,19 +447,12 @@
                 case '#/equipments': renderEquipmentsPage(); break;
                 case '#/parts': renderPartsPage(); break;
                 case '#/contracts': renderContractsPage(); break;
-                case '#/logs': renderLogsPage(); break; // New Route for Logs
+                case '#/logs': renderLogsPage(); break;
                 default: renderDashboard();
             }
         }
 
         // --- NOTIFICATIONS ---
-        
-        /**
-         * Shows a notification pop-up on the screen.
-         * @param {string} title - The title of the notification.
-         * @param {string} message - The main message content.
-         * @param {string} type - The type of notification ('info', 'success', 'error', 'warning').
-         */
         function showNotification(title, message, type = 'info') {
             const container = document.getElementById('notification-popup-container');
             if (!container) return;
@@ -489,12 +476,7 @@
 
             container.appendChild(popup);
 
-            // Trigger the animation
-            setTimeout(() => {
-                popup.classList.add('show');
-            }, 10);
-
-            // Automatically remove the notification after 5 seconds
+            setTimeout(() => popup.classList.add('show'), 10);
             setTimeout(() => {
                 popup.classList.remove('show');
                 popup.addEventListener('transitionend', () => popup.remove());
@@ -516,26 +498,16 @@
             const q = query(collection(db, `artifacts/${appId}/public/data/DI`), where("status", "==", "nouvelle"));
             
             notificationListenerUnsubscribe = onSnapshot(q, (snapshot) => {
-                const newDIs = [];
                 snapshot.docChanges().forEach((change) => {
                     if (change.type === "added") {
                         const diData = { id: change.doc.id, ...change.doc.data() };
-                        newDIs.push(diData);
-                        // Show a pop-up for each new DI
                         if (!knownNotificationIds.has(diData.id)) {
-                            showNotification(
-                                'Nouvelle Demande', 
-                                `DI pour: ${diData.type} - ${diData.location}`, 
-                                'info'
-                            );
+                            showNotification('Nouvelle Demande', `DI pour: ${diData.type} - ${diData.location}`, 'info');
                             knownNotificationIds.add(diData.id);
                         }
                     }
                 });
-
-                // Update the bell icon UI as before
                 updateNotificationUI(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-
             }, (error) => {
                 console.error("Error fetching notifications: ", error);
                 showNotification('Erreur', 'Impossible de charger les notifications.', 'error');
@@ -549,10 +521,9 @@
 
             if (!dot || !list || !panel) return;
 
-            list.innerHTML = ''; // Clear previous notifications
+            list.innerHTML = '';
 
             if (notifications.length > 0) {
-                // Only show the dot if the panel is not already open
                 if (panel.classList.contains('hidden')) {
                     dot.classList.remove('hidden');
                 }
@@ -566,9 +537,7 @@
                         <p class="text-sm text-slate-400 truncate">${di.description}</p>
                         <p class="text-xs text-slate-500 mt-1">${date}</p>
                     `;
-                    item.addEventListener('click', () => {
-                        panel.classList.add('hidden');
-                    });
+                    item.addEventListener('click', () => panel.classList.add('hidden'));
                     list.appendChild(item);
                 });
             } else {
@@ -615,7 +584,6 @@
                 e.preventDefault();
                 try {
                     await signInWithEmailAndPassword(auth, e.target['login-email'].value, e.target['login-password'].value);
-                    // The onAuthStateChanged listener will handle routing.
                 } catch (error) {
                     showNotification('Erreur de connexion', error.message, 'error');
                 }
@@ -628,13 +596,9 @@
                 try {
                     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
                     await sendEmailVerification(userCredential.user);
-                    await signOut(auth); // Sign out immediately to force login after verification
-                    showNotification(
-                        'Inscription Réussie',
-                        'Un email de vérification a été envoyé. Veuillez consulter votre boîte de réception pour activer votre compte.',
-                        'success'
-                    );
-                    e.target.reset(); // Clear the form
+                    await signOut(auth);
+                    showNotification('Inscription Réussie', 'Un email de vérification a été envoyé.', 'success');
+                    e.target.reset();
                 } catch (error) {
                     showNotification('Erreur d\'inscription', error.message, 'error');
                 }
@@ -647,11 +611,11 @@
                 <div class="flex items-center justify-center min-h-screen bg-slate-900 bg-pattern p-4">
                     <div class="w-full max-w-md p-8 space-y-6 bg-slate-800/50 backdrop-blur-sm rounded-2xl shadow-2xl border border-slate-700 text-center">
                         <h2 class="text-2xl font-bold text-white">Vérifiez votre Email</h2>
-                        <p class="text-slate-300">Un lien de vérification a été envoyé à <strong>${userEmail}</strong>. Veuillez cliquer sur le lien dans cet email pour activer votre compte.</p>
-                        <p class="text-sm text-slate-400">Si vous n'avez pas reçu l'email, vérifiez votre dossier spam ou cliquez ci-dessous pour le renvoyer.</p>
+                        <p class="text-slate-300">Un lien de vérification a été envoyé à <strong>${userEmail}</strong>.</p>
+                        <p class="text-sm text-slate-400">Si vous ne l'avez pas reçu, vérifiez votre spam ou renvoyez-le.</p>
                         <div class="space-y-4 pt-4">
-                             <button id="resend-verification-btn" class="w-full btn btn-primary">Renvoyer l'email de vérification</button>
-                             <button id="logout-verification-btn" class="w-full btn btn-secondary">Retour à la connexion</button>
+                             <button id="resend-verification-btn" class="w-full btn btn-primary">Renvoyer l'email</button>
+                             <button id="logout-verification-btn" class="w-full btn btn-secondary">Retour</button>
                         </div>
                     </div>
                 </div>
@@ -666,9 +630,7 @@
                 }
             });
 
-            document.getElementById('logout-verification-btn').addEventListener('click', async () => {
-                 await signOut(auth);
-            });
+            document.getElementById('logout-verification-btn').addEventListener('click', () => signOut(auth));
         }
 
         function getNavLinks() {
@@ -742,10 +704,7 @@
 
         function renderMobileSidebar() {
             return `
-                <!-- Overlay for mobile sidebar -->
                 <div id="mobile-sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-30 hidden md:hidden"></div>
-                
-                <!-- Mobile Sidebar -->
                 <aside id="mobile-sidebar" class="fixed top-0 left-0 h-full w-64 bg-slate-900 shadow-xl p-6 flex flex-col justify-between z-40 -translate-x-full md:hidden">
                      <div>
                         <div class="flex items-center justify-between mb-10">
@@ -834,16 +793,11 @@
                     </div>
                 </div>`;
             
-            const logoutAction = async () => {
-                await signOut(auth);
-                window.location.hash = '';
-                window.location.reload();
-            };
+            const logoutAction = () => signOut(auth);
 
             document.getElementById('logout-btn').addEventListener('click', logoutAction);
             document.getElementById('mobile-logout-btn').addEventListener('click', logoutAction);
 
-            // Mobile sidebar listeners
             document.getElementById('mobile-menu-btn').addEventListener('click', openMobileSidebar);
             document.getElementById('close-mobile-sidebar-btn').addEventListener('click', closeMobileSidebar);
             document.getElementById('mobile-sidebar-overlay').addEventListener('click', closeMobileSidebar);
@@ -869,21 +823,31 @@
                     }
                 });
             }
-            // After rendering the page, we need to re-attach the listener for notifications
             setupNotificationListener();
         }
         
         function renderDashboard() {
-            const isDemandeur = userRole === 'demandeur';
-            const dashboardTitle = isDemandeur ? "Vos Demandes" : "Tableau de Bord";
-            const chartsGridClass = isDemandeur ? "grid-cols-1 lg:grid-cols-2 gap-4 md:gap-8" : "grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4 md:gap-8";
+            let dashboardTitle;
+            let listTitle = "Vos Demandes d'Intervention Récentes";
+            if (userRole === 'demandeur') {
+                dashboardTitle = "Vos Demandes";
+            } else if (userRole === 'technicien') {
+                dashboardTitle = "Vos Interventions";
+                listTitle = "Vos Interventions Récentes";
+            } else {
+                dashboardTitle = "Tableau de Bord";
+            }
+
+            const chartsGridClass = (userRole === 'admin' || userRole === 'manager')
+                ? "grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4 md:gap-8"
+                : "grid-cols-1 lg:grid-cols-2 gap-4 md:gap-8";
 
             const content = `
                 <div id="charts-dashboard" class="grid ${chartsGridClass}"></div>
                 <div class="mt-10 bg-slate-800/70 backdrop-blur-sm rounded-xl border border-slate-700">
-                    <h3 class="text-xl font-bold p-4 md:p-6">Vos Demandes d'Intervention Récentes</h3>
+                    <h3 class="text-xl font-bold p-4 md:p-6">${listTitle}</h3>
                     <div id="recent-di-list" class="space-y-2 p-4 md:p-6 pt-0">
-                        <p class="text-slate-400">Chargement des demandes...</p>
+                        <p class="text-slate-400">Chargement...</p>
                     </div>
                 </div>`;
             renderPage(dashboardTitle, content);
@@ -895,15 +859,23 @@
             const chartContainer = document.getElementById('charts-dashboard');
             if(!chartContainer) return;
 
-            const isDemandeur = userRole === 'demandeur';
-
-            // Fetch Data
-            const diQuery = isDemandeur
-                ? query(collection(db, `artifacts/${appId}/public/data/DI`), where("demandeurId", "==", userId))
-                : collection(db, `artifacts/${appId}/public/data/DI`);
+            let diQuery;
+            const diCollectionRef = collection(db, `artifacts/${appId}/public/data/DI`);
+            let chartTitlePrefix = 'Global';
+            if (userRole === 'demandeur') {
+                diQuery = query(diCollectionRef, where("demandeurId", "==", userId));
+                chartTitlePrefix = 'Vos';
+            } else if (userRole === 'technicien') {
+                diQuery = query(diCollectionRef, where("assignedTechnicienId", "==", userId));
+                chartTitlePrefix = 'Vos';
+            } else { // admin, manager
+                diQuery = query(diCollectionRef);
+            }
+            
+            const canSeeGlobalStats = userRole === 'admin' || userRole === 'manager';
 
             const dataPromises = [getDocs(diQuery)];
-            if (!isDemandeur) {
+            if (canSeeGlobalStats) {
                 dataPromises.push(getDocs(collection(db, `artifacts/${appId}/public/data/spareParts`)));
                 dataPromises.push(getDocs(collection(db, `artifacts/${appId}/public/data/equipements`)));
             }
@@ -913,17 +885,16 @@
             const interventions = snapshots[0].docs.map(doc => doc.data());
             let parts = [];
             let equipments = [];
-            if (!isDemandeur) {
+            if (canSeeGlobalStats) {
                 parts = snapshots[1].docs.map(doc => doc.data());
                 equipments = snapshots[2].docs.map(doc => doc.data());
             }
 
-            // Render Chart Containers
             let chartsHTML = `
-                <div class="bg-slate-800/70 backdrop-blur-sm p-4 md:p-6 rounded-xl border border-slate-700 ${!isDemandeur ? 'col-span-1 lg:col-span-2 xl:col-span-1' : ''}"><canvas id="interventionTypeChart"></canvas></div>
+                <div class="bg-slate-800/70 backdrop-blur-sm p-4 md:p-6 rounded-xl border border-slate-700 ${canSeeGlobalStats ? 'col-span-1 lg:col-span-2 xl:col-span-1' : ''}"><canvas id="interventionTypeChart"></canvas></div>
                 <div class="bg-slate-800/70 backdrop-blur-sm p-4 md:p-6 rounded-xl border border-slate-700"><canvas id="interventionStatusChart"></canvas></div>
             `;
-            if (!isDemandeur) {
+            if (canSeeGlobalStats) {
                 chartsHTML += `
                     <div class="bg-slate-800/70 backdrop-blur-sm p-4 md:p-6 rounded-xl border border-slate-700"><canvas id="stockStatusChart"></canvas></div>
                     <div id="total-equipments-kpi-container" class="perspective-container"></div>
@@ -931,7 +902,6 @@
             }
             chartContainer.innerHTML = chartsHTML;
 
-            // Populate Charts
             const typeCounts = interventions.reduce((acc, di) => {
                 acc[di.type] = (acc[di.type] || 0) + 1;
                 return acc;
@@ -943,18 +913,16 @@
                     data: {
                         labels: Object.keys(typeCounts).length > 0 ? Object.keys(typeCounts) : ["Aucune Donnée"],
                         datasets: [{
-                            label: 'Interventions par Type',
                             data: Object.keys(typeCounts).length > 0 ? Object.values(typeCounts) : [1],
                             backgroundColor: Object.keys(typeCounts).length > 0 ? ['#6366f1', '#38bdf8', '#fbbf24', '#4ade80', '#a78bfa', '#f87171'] : ['#334155'],
-                            borderColor: '#0f172a',
-                            borderWidth: 4
+                            borderColor: '#0f172a', borderWidth: 4
                         }]
                     },
                     options: {
                         responsive: true,
                         plugins: {
                             legend: { position: 'top', labels: { color: '#cbd5e1' } },
-                            title: { display: true, text: 'Répartition de vos Interventions', color: '#cbd5e1', font: { size: 16 } }
+                            title: { display: true, text: `Répartition de ${chartTitlePrefix.toLowerCase()} Interventions`, color: '#cbd5e1', font: { size: 16 } }
                         }
                     }
                 });
@@ -981,7 +949,7 @@
                         responsive: true,
                         plugins: {
                             legend: { display: false },
-                            title: { display: true, text: 'Statut de vos Interventions', color: '#cbd5e1', font: { size: 16 } }
+                            title: { display: true, text: `Statut de ${chartTitlePrefix.toLowerCase()} Interventions`, color: '#cbd5e1', font: { size: 16 } }
                         },
                         scales: {
                             y: { ticks: { color: '#94a3b8' }, grid: { color: '#334155' } },
@@ -991,7 +959,7 @@
                 });
             }
 
-            if (!isDemandeur) {
+            if (canSeeGlobalStats) {
                 const stockStatus = { ok: 0, low: 0, critical: 0 };
                 parts.forEach(part => {
                     const stock = parseInt(part.stock, 10);
@@ -1115,16 +1083,14 @@
         }
         
         function renderDIList() {
-            let allDIsForExport = []; // To hold the current list of DIs
+            let allDIsForExport = [];
 
             const content = `
                 <div class="bg-slate-800/70 border border-slate-700 rounded-xl p-4 md:p-6">
                     <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 flex-wrap gap-4">
                         <h3 class="text-xl font-semibold text-white">Suivi des Demandes et OT</h3>
                         <button id="export-interventions-btn" class="btn btn-success hidden">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clip-rule="evenodd" />
-                            </svg>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clip-rule="evenodd" /></svg>
                             Exporter la sélection
                         </button>
                     </div>
@@ -1132,14 +1098,17 @@
                 </div>`;
             renderPage("Suivi des Demandes d'Intervention et OT", content);
             
-            document.getElementById('export-interventions-btn').addEventListener('click', () => {
-                handleExportInterventions(allDIsForExport);
-            });
+            document.getElementById('export-interventions-btn').addEventListener('click', () => handleExportInterventions(allDIsForExport));
 
             const diCollectionRef = collection(db, `artifacts/${appId}/public/data/DI`);
-            const q = (userRole === 'admin' || userRole === 'manager' || userRole === 'technicien') 
-                ? query(diCollectionRef)
-                : query(diCollectionRef, where("demandeurId", "==", userId));
+            let q;
+            if (userRole === 'admin' || userRole === 'manager') {
+                q = query(diCollectionRef);
+            } else if (userRole === 'technicien') {
+                q = query(diCollectionRef, where("assignedTechnicienId", "==", userId));
+            } else { // demandeur
+                q = query(diCollectionRef, where("demandeurId", "==", userId));
+            }
             
             onSnapshot(q, (querySnapshot) => {
                 const listContainer = document.getElementById('di-list-container');
@@ -1299,7 +1268,6 @@
             const diDocSnap = await getDoc(diDocRef);
             const diData = diDocSnap.data();
 
-            // Fetch technicians if cache is empty
             if (allTechniciens.length === 0) {
                 try {
                     const techQuery = query(collection(db, `artifacts/${appId}/users`), where("role", "==", "technicien"), where("disabled", "==", false));
@@ -1310,17 +1278,14 @@
                 }
             }
 
-            // Populate technician dropdown
             const techSelect = document.getElementById('ot-technician-select');
             techSelect.innerHTML = `<option value="">-- Choisir un technicien --</option>` + 
                 allTechniciens.map(tech => `<option value="${tech.id}" data-email="${tech.email}">${tech.email}</option>`).join('');
             
-            // Pre-select technician if already assigned
             if (diData.assignedTechnicienId) {
                 techSelect.value = diData.assignedTechnicienId;
             }
 
-            // Fetch parts if cache is empty
             if (allParts.length === 0) {
                 try {
                     const partsSnapshot = await getDocs(collection(db, `artifacts/${appId}/public/data/spareParts`));
@@ -1330,12 +1295,10 @@
                 }
             }
             
-            // Populate parts dropdown
             const partsSelect = document.getElementById('ot-part-select');
             partsSelect.innerHTML = `<option value="">-- Choisir une pièce --</option>` + 
                 allParts.map(part => `<option value="${part.id}">${part.designation} (Stock: ${part.stock})</option>`).join('');
 
-            // Setup parts radio button logic
             document.querySelectorAll('input[name="ot-use-parts"]').forEach(radio => {
                 radio.addEventListener('change', (e) => {
                     document.getElementById('ot-parts-usage-container').classList.toggle('hidden', e.target.value === 'no');
@@ -1388,7 +1351,6 @@
                 }];
             }
             
-            // Save all data in a batch
             const diDocRef = doc(db, `artifacts/${appId}/public/data/DI`, diId);
             try {
                 const batch = writeBatch(db);
@@ -1455,7 +1417,6 @@
             const content = `
                 <div class="bg-slate-800/70 border border-slate-700 rounded-xl p-2 md:p-4"><div id='calendar'></div></div>
                 
-                <!-- Modal for ADDING event -->
                 <div id="event-modal" class="fixed inset-0 bg-black bg-opacity-70 overflow-y-auto h-full w-full hidden z-50 flex items-center justify-center p-4">
                   <div class="relative p-5 border w-full max-w-md shadow-lg rounded-xl bg-slate-800 border-slate-700">
                     <div class="mt-3 text-center">
@@ -1465,17 +1426,16 @@
                           <input type="text" id="event-title" placeholder="Titre de l'événement" class="form-input" required>
                           <input type="text" id="event-date-display" class="form-input" disabled>
                           <input type="hidden" id="event-date">
-                          <button type="submit" class="text-white bg-indigo-600 hover:bg-indigo-700 font-semibold py-2 px-4 rounded-lg transition-colors w-full">Enregistrer</button>
+                          <button type="submit" class="btn btn-primary w-full">Enregistrer</button>
                         </form>
                       </div>
                       <div class="items-center px-4 py-3">
-                        <button id="close-modal-btn" class="text-white bg-slate-600 hover:bg-slate-700 font-semibold py-2 px-4 rounded-lg transition-colors w-full">Annuler</button>
+                        <button id="close-modal-btn" class="btn btn-secondary w-full">Annuler</button>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                <!-- Modal for EDITING event -->
                 <div id="edit-event-modal" class="fixed inset-0 bg-black bg-opacity-70 overflow-y-auto h-full w-full hidden z-50 flex items-center justify-center p-4">
                   <div class="relative p-5 border w-full max-w-md shadow-lg rounded-xl bg-slate-800 border-slate-700">
                     <div class="mt-3">
@@ -1558,7 +1518,13 @@
                 },
                 events: async (fetchInfo, successCallback, failureCallback) => {
                     try {
-                        const otQuery = query(collection(db, `artifacts/${appId}/public/data/DI`), where("isOT", "==", true));
+                        let otQuery;
+                        if (userRole === 'technicien') {
+                            otQuery = query(collection(db, `artifacts/${appId}/public/data/DI`), where("isOT", "==", true), where("assignedTechnicienId", "==", userId));
+                        } else { // admin, manager
+                            otQuery = query(collection(db, `artifacts/${appId}/public/data/DI`), where("isOT", "==", true));
+                        }
+                        
                         const eventsQuery = query(collection(db, `artifacts/${appId}/public/data/customEvents`));
                         const preventiveQuery = query(collection(db, `artifacts/${appId}/public/data/preventiveTasks`));
                         
@@ -1589,16 +1555,13 @@
                                 title: data.title,
                                 start: data.date,
                                 allDay: true,
-                                backgroundColor: '#9333ea', // Purple for custom events
+                                backgroundColor: '#9333ea',
                                 borderColor: '#9333ea',
                                 extendedProps: { isCustom: true }
                             }
                         });
 
-                        const frequencyMap = {
-                            weekly: 'WEEKLY', monthly: 'MONTHLY', quarterly: 'MONTHLY',
-                            semestrial: 'MONTHLY', yearly: 'YEARLY'
-                        };
+                        const frequencyMap = { weekly: 'WEEKLY', monthly: 'MONTHLY', quarterly: 'MONTHLY', semestrial: 'MONTHLY', yearly: 'YEARLY' };
                         const intervalMap = { quarterly: 3, semestrial: 6 };
 
                         const preventiveEvents = preventiveTasksSnapshot.docs.map(doc => {
@@ -1612,12 +1575,11 @@
                                     dtstart: task.startDate
                                 },
                                 allDay: true,
-                                backgroundColor: '#14b8a6', // Teal for preventive
+                                backgroundColor: '#14b8a6',
                                 borderColor: '#14b8a6',
                                 extendedProps: { isPreventive: true }
                             }
                         });
-
 
                         successCallback([...otEvents, ...customEvents, ...preventiveEvents]);
                    } catch (e) { 
@@ -1628,7 +1590,6 @@
             });
             calendar.render();
 
-            // --- Modal Listeners ---
             document.getElementById('close-modal-btn').addEventListener('click', () => {
                 document.getElementById('event-modal').classList.add('hidden');
             });
@@ -1686,7 +1647,7 @@
                 showNotification("Événement supprimé", "L'événement a été retiré du planning.", "success");
                 document.getElementById('delete-confirm-modal').classList.add('hidden');
                 document.getElementById('edit-event-modal').classList.add('hidden');
-                router(); // Force re-render of the calendar
+                router();
             } catch (error) {
                 showNotification("Erreur", error.message, "error");
             }
@@ -1891,17 +1852,12 @@
                 `;
             renderPage('Gestion des Équipements', content);
             
-            // --- Event Listeners ---
             document.getElementById('add-equipment-btn').addEventListener('click', () => openEquipmentModal());
             document.getElementById('cancel-equip-btn').addEventListener('click', closeEquipmentModal);
             document.getElementById('equipment-form').addEventListener('submit', handleSaveEquipment);
             
-            document.getElementById('filter-equipment-btn').addEventListener('click', () => {
-                document.getElementById('filter-modal').classList.remove('hidden');
-            });
-            document.getElementById('cancel-filter-btn').addEventListener('click', () => {
-                document.getElementById('filter-modal').classList.add('hidden');
-            });
+            document.getElementById('filter-equipment-btn').addEventListener('click', () => document.getElementById('filter-modal').classList.remove('hidden'));
+            document.getElementById('cancel-filter-btn').addEventListener('click', () => document.getElementById('filter-modal').classList.add('hidden'));
             document.getElementById('filter-form').addEventListener('submit', (e) => {
                 e.preventDefault();
                 applyFilters();
@@ -2155,9 +2111,15 @@
             const listContainer = document.getElementById('recent-di-list');
             if (!listContainer) return;
         
-            const q = (userRole === 'admin' || userRole === 'manager' || userRole === 'technicien') 
-                ? query(collection(db, `artifacts/${appId}/public/data/DI`)) 
-                : query(collection(db, `artifacts/${appId}/public/data/DI`), where("demandeurId", "==", userId));
+            let q;
+            const diCollectionRef = collection(db, `artifacts/${appId}/public/data/DI`);
+            if (userRole === 'admin' || userRole === 'manager') {
+                q = query(diCollectionRef);
+            } else if (userRole === 'technicien') {
+                q = query(diCollectionRef, where("assignedTechnicienId", "==", userId));
+            } else { // demandeur
+                q = query(diCollectionRef, where("demandeurId", "==", userId));
+            }
 
             try {
                 const querySnapshot = await getDocs(q);
