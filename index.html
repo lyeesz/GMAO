@@ -4,7 +4,7 @@
     <link rel="manifest" href="manifest.json">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GMAO IPM Web App </title>
+    <title>GMAO IPM Web App</title>
 
     <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -304,6 +304,7 @@
         let allPreventiveTasks = [];
         let allContracts = [];
         let allTechniciens = [];
+        let allPersonnels = [];
         
         let notificationListenerUnsubscribe = null;
         let knownNotificationIds = new Set();
@@ -447,6 +448,7 @@
                 case '#/equipments': renderEquipmentsPage(); break;
                 case '#/parts': renderPartsPage(); break;
                 case '#/contracts': renderContractsPage(); break;
+                case '#/personnels': renderPersonnelsPage(); break;
                 case '#/logs': renderLogsPage(); break;
                 default: renderDashboard();
             }
@@ -669,6 +671,11 @@
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd" /></svg>
                     <span>Contrats</span></a>`;
             }
+             if (userRole === 'manager' || userRole === 'admin') {
+                navLinks += `<a href="#/personnels" class="${hash === '#/personnels' ? activeLinkClasses : linkClasses}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" /></svg>
+                    <span>Personnels</span></a>`;
+             }
             if (userRole === 'admin') {
                 navLinks += `<a href="#/users" class="${hash === '#/users' ? activeLinkClasses : linkClasses}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" /></svg>
@@ -1979,6 +1986,7 @@
                 else if (type === 'event') await deleteCalendarEvent(id);
                 else if (type === 'preventive') await deletePreventiveTask(id);
                 else if (type === 'contract') await deleteContract(id);
+                else if (type === 'personnel') await deletePersonnel(id);
             };
             
             const newConfirmBtn = confirmBtn.cloneNode(true);
@@ -2900,6 +2908,182 @@
                 container.appendChild(label);
             });
         }
+        
+        // --- PERSONNEL MANAGEMENT FUNCTIONS ---
+        function renderPersonnelsPage() {
+            if (userRole !== 'manager' && userRole !== 'admin') {
+                renderPage('Accès non autorisé', '<p class="text-red-400">Vous n\'avez pas les droits pour accéder à cette page.</p>');
+                return;
+            }
+            const content = `
+                <div class="bg-slate-800/70 border border-slate-700 rounded-xl p-4 md:p-6">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 flex-wrap gap-4">
+                        <h3 class="text-xl font-semibold text-white">Gestion du Personnel</h3>
+                        <button id="add-personnel-btn" class="btn btn-primary">Ajouter un Membre</button>
+                    </div>
+                    <div id="personnels-list-container" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                        <!-- Personnel cards will be injected here -->
+                    </div>
+                </div>
+
+                <!-- Modal for adding/editing personnel -->
+                <div id="personnel-modal" class="fixed inset-0 bg-black bg-opacity-70 hidden z-50 flex items-center justify-center overflow-y-auto p-4">
+                    <div class="bg-slate-800 rounded-lg shadow-xl p-6 w-full max-w-lg my-8 border border-slate-700">
+                        <h3 id="personnel-modal-title" class="text-lg font-medium mb-4 text-white">Ajouter un Membre</h3>
+                        <form id="personnel-form" class="space-y-4">
+                            <input type="hidden" id="personnel-id">
+                            <div>
+                                <label for="personnel-name" class="text-sm font-medium text-slate-300">Nom et Prénom</label>
+                                <input id="personnel-name" type="text" required class="form-input mt-1">
+                            </div>
+                            <div>
+                                <label for="personnel-function" class="text-sm font-medium text-slate-300">Fonction</label>
+                                <input id="personnel-function" type="text" placeholder="Ex: Technicien Biomédical" required class="form-input mt-1">
+                            </div>
+                            <div>
+                                <label for="personnel-email" class="text-sm font-medium text-slate-300">Email</label>
+                                <input id="personnel-email" type="email" class="form-input mt-1">
+                            </div>
+                             <div>
+                                <label for="personnel-phone" class="text-sm font-medium text-slate-300">Téléphone</label>
+                                <input id="personnel-phone" type="tel" class="form-input mt-1">
+                            </div>
+                            <div>
+                                <label for="personnel-photo" class="text-sm font-medium text-slate-300">URL de la Photo (Optionnel)</label>
+                                <input id="personnel-photo" type="text" placeholder="https://example.com/photo.jpg" class="form-input mt-1">
+                            </div>
+                            <div class="mt-6 flex justify-end space-x-2">
+                                <button type="button" id="cancel-personnel-btn" class="btn btn-secondary">Annuler</button>
+                                <button type="submit" class="btn btn-primary">Sauvegarder</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            `;
+            renderPage('Gestion du Personnel', content);
+
+            document.getElementById('add-personnel-btn').addEventListener('click', () => openPersonnelModal());
+            document.getElementById('cancel-personnel-btn').addEventListener('click', closePersonnelModal);
+            document.getElementById('personnel-form').addEventListener('submit', handleSavePersonnel);
+
+            const personnelsCollectionRef = collection(db, `artifacts/${appId}/public/data/personnels`);
+            onSnapshot(personnelsCollectionRef, (snapshot) => {
+                allPersonnels = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
+                displayPersonnels(allPersonnels);
+            });
+        }
+
+        function displayPersonnels(personnels) {
+            const container = document.getElementById('personnels-list-container');
+            if (!container) return;
+            container.innerHTML = '';
+            if (personnels.length === 0) {
+                container.innerHTML = '<p class="text-slate-400 col-span-full text-center">Aucun membre du personnel trouvé.</p>';
+                return;
+            }
+
+            personnels.forEach(p => {
+                const card = document.createElement('div');
+                card.className = 'bg-slate-900/50 p-5 rounded-xl border border-slate-700 text-center flex flex-col';
+                
+                const name = p.name || 'N/A';
+                const initials = name.split(' ').map(n => n[0]).join('').toUpperCase();
+                const photoUrl = p.photoUrl || `https://placehold.co/128x128/1e293b/94a3b8?text=${initials}`;
+
+                card.innerHTML = `
+                    <div class="flex-grow">
+                        <img src="${photoUrl}" alt="Photo de ${name}" class="w-24 h-24 rounded-full mx-auto mb-4 object-cover border-2 border-slate-600" onerror="this.onerror=null;this.src='https://placehold.co/128x128/1e293b/94a3b8?text=${initials}';">
+                        <h4 class="font-bold text-lg text-white truncate">${name}</h4>
+                        <p class="text-indigo-400 text-sm">${p.function || 'Fonction non spécifiée'}</p>
+                        <div class="mt-3 text-left space-y-2 text-sm">
+                           ${p.email ? `<p class="text-slate-400 truncate"><span class="font-semibold text-slate-300">Email:</span> ${p.email}</p>` : ''}
+                           ${p.phone ? `<p class="text-slate-400 truncate"><span class="font-semibold text-slate-300">Tél:</span> ${p.phone}</p>` : ''}
+                        </div>
+                    </div>
+                    <div class="mt-5 pt-4 border-t border-slate-700 flex justify-center space-x-2">
+                        <button data-id="${p.id}" class="btn btn-warning edit-personnel-btn p-2">
+                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                        </button>
+                        <button data-id="${p.id}" class="btn btn-danger delete-personnel-btn p-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        </button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+
+            container.querySelectorAll('.edit-personnel-btn').forEach(btn => btn.addEventListener('click', (e) => openPersonnelModal(e.currentTarget.dataset.id)));
+            container.querySelectorAll('.delete-personnel-btn').forEach(btn => btn.addEventListener('click', (e) => openDeleteModal(e.currentTarget.dataset.id, 'personnel')));
+        }
+        
+        function openPersonnelModal(id = null) {
+            const modal = document.getElementById('personnel-modal');
+            const form = document.getElementById('personnel-form');
+            const title = document.getElementById('personnel-modal-title');
+            form.reset();
+            document.getElementById('personnel-id').value = '';
+
+            if (id) {
+                title.textContent = "Modifier le Membre";
+                const p = allPersonnels.find(person => person.id === id);
+                if (p) {
+                    document.getElementById('personnel-id').value = p.id;
+                    document.getElementById('personnel-name').value = p.name || '';
+                    document.getElementById('personnel-function').value = p.function || '';
+                    document.getElementById('personnel-email').value = p.email || '';
+                    document.getElementById('personnel-phone').value = p.phone || '';
+                    document.getElementById('personnel-photo').value = p.photoUrl || '';
+                }
+            } else {
+                title.textContent = "Ajouter un Membre";
+            }
+            modal.classList.remove('hidden');
+        }
+
+        function closePersonnelModal() {
+            document.getElementById('personnel-modal').classList.add('hidden');
+        }
+
+        async function handleSavePersonnel(e) {
+            e.preventDefault();
+            const id = document.getElementById('personnel-id').value;
+            const personnelData = {
+                name: document.getElementById('personnel-name').value,
+                function: document.getElementById('personnel-function').value,
+                email: document.getElementById('personnel-email').value,
+                phone: document.getElementById('personnel-phone').value,
+                photoUrl: document.getElementById('personnel-photo').value,
+            };
+
+            try {
+                if (id) {
+                    await updateDoc(doc(db, `artifacts/${appId}/public/data/personnels`, id), personnelData);
+                    await logActivity('edit_personnel', { personnelId: id, name: personnelData.name });
+                    showNotification("Membre mis à jour", "Les modifications ont été enregistrées.", "success");
+                } else {
+                    personnelData.createdAt = serverTimestamp();
+                    const docRef = await addDoc(collection(db, `artifacts/${appId}/public/data/personnels`), personnelData);
+                    await logActivity('create_personnel', { personnelId: docRef.id, name: personnelData.name });
+                    showNotification("Membre ajouté", "Le nouveau membre a été ajouté.", "success");
+                }
+                closePersonnelModal();
+            } catch (error) {
+                showNotification("Erreur", error.message, "error");
+            }
+        }
+
+        async function deletePersonnel(id) {
+            if (!id) return;
+            try {
+                await deleteDoc(doc(db, `artifacts/${appId}/public/data/personnels`, id));
+                await logActivity('delete_personnel', { personnelId: id });
+                showNotification("Membre supprimé", "Le membre du personnel a été supprimé.", "success");
+                document.getElementById('delete-confirm-modal').classList.add('hidden');
+            } catch (error) {
+                showNotification("Erreur", error.message, "error");
+            }
+        }
+
 
         // --- LOGS PAGE ---
         function renderLogsPage() {
