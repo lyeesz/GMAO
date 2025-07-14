@@ -1,10 +1,9 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <link rel="manifest" href="manifest.json">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GMAO IPM Web App</title>
+    <title>GMAO IPM Web App </title>
 
     <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -1042,31 +1041,147 @@
             setup3dCardEffect();
         }
 
-        function renderDIForm() {
-            const content = `<div class="max-w-3xl mx-auto"><form id="di-form" class="bg-slate-800/70 border border-slate-700 p-6 md:p-8 space-y-6 rounded-xl">
-                <div>
-                    <label for="di-type" class="text-sm font-medium text-slate-300">Type de problème</label>
-                    <select id="di-type" required class="form-input mt-1">
-                        <option>Biomédical</option><option>Électrique</option><option>Plomberie</option><option>Bâtiment</option><option>Autre</option>
-                    </select>
-                </div>
-                <div>
-                    <label for="di-location" class="text-sm font-medium text-slate-300">Lieu / Équipement</label>
-                    <input id="di-location" type="text" placeholder="Ex: Recherche, Virologie" required class="form-input mt-1">
-                </div>
-                <div>
-                    <label for="di-description" class="text-sm font-medium text-slate-300">Description du problème</label>
-                    <textarea id="di-description" rows="4" required class="form-input mt-1"></textarea>
-                </div>
-                <div class="flex justify-end"><button type="submit" class="btn btn-primary">Soumettre la Demande</button></div>
-            </form></div>`;
+        async function renderDIForm() {
+            // Ensure equipment data is loaded
+            if (allEquipments.length === 0) {
+                try {
+                    const snapshot = await getDocs(collection(db, `artifacts/${appId}/public/data/equipements`));
+                    allEquipments = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
+                } catch (error) {
+                    console.error("Failed to fetch equipments for DI form:", error);
+                    showNotification("Erreur", "Impossible de charger la liste des équipements.", "error");
+                }
+            }
+
+            const uniqueLocalisations = [...new Set(allEquipments.map(e => e.localisation?.trim()).filter(Boolean))];
+            const locationOptions = uniqueLocalisations.map(loc => `<option value="${loc}">${loc}</option>`).join('');
+
+            const content = `
+            <div class="max-w-3xl mx-auto">
+                <form id="di-form" class="bg-slate-800/70 border border-slate-700 p-6 md:p-8 space-y-6 rounded-xl">
+                    <div>
+                        <label for="di-type" class="text-sm font-medium text-slate-300">Type de problème</label>
+                        <select id="di-type" required class="form-input mt-1">
+                            <option>Biomédical</option><option>Électrique</option><option>Plomberie</option><option>Bâtiment</option><option>Autre</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Location Dropdown -->
+                    <div>
+                        <label for="di-location-select" class="text-sm font-medium text-slate-300">Localisation</label>
+                        <select id="di-location-select" required class="form-input mt-1">
+                            <option value="">-- Choisir une localisation --</option>
+                            ${locationOptions}
+                            <option value="autre">Autre (préciser)</option>
+                        </select>
+                    </div>
+                    <div id="di-location-other-container" class="hidden">
+                        <label for="di-location-other" class="text-sm font-medium text-slate-300">Préciser la localisation</label>
+                        <input id="di-location-other" type="text" class="form-input mt-1" placeholder="Entrez la localisation manuellement">
+                    </div>
+
+                    <!-- Equipment Dropdown -->
+                    <div>
+                        <label for="di-equipment-select" class="text-sm font-medium text-slate-300">Équipement</label>
+                        <select id="di-equipment-select" required class="form-input mt-1" disabled>
+                            <option value="">-- D'abord choisir une localisation --</option>
+                        </select>
+                    </div>
+                    <div id="di-equipment-other-container" class="hidden">
+                        <label for="di-equipment-other" class="text-sm font-medium text-slate-300">Préciser l'équipement</label>
+                        <input id="di-equipment-other" type="text" class="form-input mt-1" placeholder="Entrez l'équipement manuellement">
+                    </div>
+
+                    <div>
+                        <label for="di-description" class="text-sm font-medium text-slate-300">Description du problème</label>
+                        <textarea id="di-description" rows="4" required class="form-input mt-1"></textarea>
+                    </div>
+                    <div class="flex justify-end"><button type="submit" class="btn btn-primary">Soumettre la Demande</button></div>
+                </form>
+            </div>`;
+
             renderPage("Créer une Demande d'Intervention (DI)", content);
-            
+
+            // Add event listeners
+            const locationSelect = document.getElementById('di-location-select');
+            const locationOtherContainer = document.getElementById('di-location-other-container');
+            const locationOtherInput = document.getElementById('di-location-other');
+            const equipmentSelect = document.getElementById('di-equipment-select');
+            const equipmentOtherContainer = document.getElementById('di-equipment-other-container');
+            const equipmentOtherInput = document.getElementById('di-equipment-other');
+
+            locationSelect.addEventListener('change', (e) => {
+                const selectedLocation = e.target.value;
+                
+                // Reset equipment fields
+                equipmentSelect.innerHTML = '<option value="">-- Choisir un équipement --</option>';
+                equipmentOtherContainer.classList.add('hidden');
+                equipmentOtherInput.value = '';
+
+                if (selectedLocation === 'autre') {
+                    locationOtherContainer.classList.remove('hidden');
+                    locationOtherInput.required = true;
+                    equipmentSelect.innerHTML += '<option value="autre">Autre (préciser)</option>';
+                    equipmentSelect.disabled = false;
+                } else if (selectedLocation) {
+                    locationOtherContainer.classList.add('hidden');
+                    locationOtherInput.required = false;
+                    locationOtherInput.value = '';
+                    
+                    const equipmentsInLocation = allEquipments.filter(equip => equip.localisation === selectedLocation);
+                    
+                    if (equipmentsInLocation.length > 0) {
+                        const equipmentOptions = equipmentsInLocation.map(equip => 
+                            `<option value="${equip.designation} (N°: ${equip.inventaire || 'N/A'})">${equip.designation} (N°: ${equip.inventaire || 'N/A'})</option>`
+                        ).join('');
+                        equipmentSelect.innerHTML += equipmentOptions;
+                    }
+                    
+                    equipmentSelect.innerHTML += '<option value="autre">Autre (préciser)</option>';
+                    equipmentSelect.disabled = false;
+                } else {
+                    locationOtherContainer.classList.add('hidden');
+                    locationOtherInput.required = false;
+                    equipmentSelect.innerHTML = '<option value="">-- D\'abord choisir une localisation --</option>';
+                    equipmentSelect.disabled = true;
+                }
+            });
+
+            equipmentSelect.addEventListener('change', (e) => {
+                if (e.target.value === 'autre') {
+                    equipmentOtherContainer.classList.remove('hidden');
+                    equipmentOtherInput.required = true;
+                } else {
+                    equipmentOtherContainer.classList.add('hidden');
+                    equipmentOtherInput.required = false;
+                    equipmentOtherInput.value = '';
+                }
+            });
+
+            // Update submission logic
             document.getElementById('di-form').addEventListener('submit', async (e) => {
                 e.preventDefault();
+
+                let locationValue = document.getElementById('di-location-select').value;
+                if (locationValue === 'autre') {
+                    locationValue = document.getElementById('di-location-other').value;
+                }
+
+                let equipmentValue = document.getElementById('di-equipment-select').value;
+                if (equipmentValue === 'autre') {
+                    equipmentValue = document.getElementById('di-equipment-other').value;
+                }
+                
+                if (!locationValue || !equipmentValue) {
+                    showNotification("Champs manquants", "Veuillez préciser la localisation et l'équipement.", "warning");
+                    return;
+                }
+                
+                const finalLocation = `${locationValue} - ${equipmentValue}`;
+
                 const diData = {
                     type: document.getElementById('di-type').value,
-                    location: document.getElementById('di-location').value,
+                    location: finalLocation, // Combined value
                     description: document.getElementById('di-description').value,
                     demandeurId: userId,
                     demandeurEmail: currentUser.email,
